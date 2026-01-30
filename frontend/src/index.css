@@ -1,0 +1,242 @@
+@import url('https://fonts.googleapis.com/css2?family=Rawline:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Government Blue Theme - Brazilian Gov Standard */
+    --background: 210 20% 98%;
+    --foreground: 213 32% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 213 32% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 32% 15%;
+
+    /* Primary - Institutional Blue */
+    --primary: 217 87% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Light Blue */
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 217 87% 40%;
+
+    --muted: 210 25% 94%;
+    --muted-foreground: 215 16% 47%;
+
+    /* Accent - Green for success actions */
+    --accent: 139 75% 30%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Warning */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Info */
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 87% 40%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Darker institutional */
+    --sidebar-background: 217 87% 20%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 217 87% 20%;
+    --sidebar-accent: 217 87% 28%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 217 70% 30%;
+    --sidebar-ring: 217 87% 60%;
+
+    /* Custom tokens for SCGES */
+    --gov-blue: 217 87% 40%;
+    --gov-blue-dark: 217 87% 20%;
+    --gov-blue-light: 210 60% 95%;
+    --gov-green: 139 75% 30%;
+    --gov-green-light: 139 50% 95%;
+    --gov-yellow: 38 92% 50%;
+    --gov-red: 0 72% 51%;
+  }
+
+  .dark {
+    --background: 217 32% 12%;
+    --foreground: 210 40% 98%;
+
+    --card: 217 32% 16%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 217 32% 16%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 60% 60%;
+    --primary-foreground: 217 32% 12%;
+
+    --secondary: 217 32% 20%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 32% 20%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 139 60% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 210 40% 98%;
+
+    --warning: 38 80% 45%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 199 70% 45%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 217 32% 24%;
+    --input: 217 32% 24%;
+    --ring: 210 60% 60%;
+
+    --sidebar-background: 217 40% 10%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 210 60% 60%;
+    --sidebar-primary-foreground: 217 40% 10%;
+    --sidebar-accent: 217 32% 18%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 32% 20%;
+    --sidebar-ring: 210 60% 60%;
+
+    --gov-blue: 210 60% 60%;
+    --gov-blue-dark: 217 40% 10%;
+    --gov-blue-light: 217 32% 20%;
+    --gov-green: 139 60% 45%;
+    --gov-green-light: 139 40% 20%;
+    --gov-yellow: 38 80% 45%;
+    --gov-red: 0 62% 40%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Rawline', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  /* Stats Card Variants */
+  .stats-card {
+    @apply relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm transition-all duration-200 hover:shadow-md;
+  }
+
+  .stats-card-primary {
+    @apply stats-card border-l-4 border-l-primary;
+  }
+
+  .stats-card-accent {
+    @apply stats-card border-l-4 border-l-accent;
+  }
+
+  .stats-card-warning {
+    @apply stats-card border-l-4;
+    border-left-color: hsl(var(--warning));
+  }
+
+  .stats-card-info {
+    @apply stats-card border-l-4;
+    border-left-color: hsl(var(--info));
+  }
+
+  /* Gov Header */
+  .gov-header {
+    @apply bg-primary text-primary-foreground py-4 px-6;
+    background: linear-gradient(135deg, hsl(var(--gov-blue-dark)) 0%, hsl(var(--gov-blue)) 100%);
+  }
+
+  /* Page Header */
+  .page-header {
+    @apply mb-6 pb-4 border-b;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold text-foreground;
+  }
+
+  .page-description {
+    @apply text-muted-foreground mt-1;
+  }
+
+  /* Data Table Styles */
+  .data-table-wrapper {
+    @apply rounded-lg border bg-card overflow-hidden;
+  }
+
+  /* Badge Variants */
+  .badge-entrada {
+    @apply bg-gov-green-light text-accent font-medium;
+  }
+
+  .badge-saida {
+    @apply bg-destructive/10 text-destructive font-medium;
+  }
+
+  /* Form Section */
+  .form-section {
+    @apply space-y-4 p-6 bg-card rounded-lg border;
+  }
+
+  /* Action Button Group */
+  .action-btn-group {
+    @apply flex items-center gap-2;
+  }
+}
+
+@layer utilities {
+  .text-gov-blue {
+    color: hsl(var(--gov-blue));
+  }
+
+  .bg-gov-blue {
+    background-color: hsl(var(--gov-blue));
+  }
+
+  .bg-gov-blue-light {
+    background-color: hsl(var(--gov-blue-light));
+  }
+
+  .bg-gov-green {
+    background-color: hsl(var(--gov-green));
+  }
+
+  .bg-gov-green-light {
+    background-color: hsl(var(--gov-green-light));
+  }
+
+  .border-gov-blue {
+    border-color: hsl(var(--gov-blue));
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  /* Glass effect for overlays */
+  .glass {
+    @apply bg-background/80 backdrop-blur-sm;
+  }
+}

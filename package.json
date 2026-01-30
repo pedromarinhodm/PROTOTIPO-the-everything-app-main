@@ -1,0 +1,14 @@
+{
+  "name": "the-everything-app-main-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "start:backend": "npm --prefix backend run start",
+    "install:frontend": "npm --prefix frontend install",
+    "install:backend": "npm --prefix backend install",
+    "lint": "eslint frontend --ext .ts,.tsx,.js,.jsx",
+    "test": "npm --prefix frontend run test"
+  }
+}

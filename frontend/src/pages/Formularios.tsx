@@ -1,0 +1,241 @@
+import React, { useEffect, useState } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FileDown, FileText, Trash2, Plus } from "lucide-react";
+import { api } from "@/services/api";
+import { toast } from "sonner";
+
+type FileItem = {
+  _id: string;
+  fileId: string;
+  filename: string;
+  data_inicial: string;
+  data_final: string;
+  uploadDate: string;
+};
+
+export default function Formularios() {
+  const [lista, setLista] = useState<FileItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [openModal, setOpenModal] = useState(false);
+  const [fileInput, setFileInput] = useState<File | null>(null);
+  const [dataInicial, setDataInicial] = useState("");
+  const [dataFinal, setDataFinal] = useState("");
+  const [filterIni, setFilterIni] = useState("");
+  const [filterFim, setFilterFim] = useState("");
+
+  useEffect(() => {
+    carregar();
+  }, []);
+
+  async function carregar() {
+    setLoading(true);
+    try {
+      const res = await api.files.getAll();
+      setLista(res);
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível carregar os formulários");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function filtrarLista() {
+    return lista.filter((f) => {
+      if (!filterIni && !filterFim) return true;
+      const upload = f.uploadDate ? new Date(f.uploadDate) : null;
+      if (!upload) return false;
+      if (filterIni) {
+        const di = new Date(`${filterIni}T00:00:00`);
+        if (upload < di) return false;
+      }
+      if (filterFim) {
+        const df = new Date(`${filterFim}T23:59:59`);
+        if (upload > df) return false;
+      }
+      return true;
+    });
+  }
+
+  async function enviar(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!fileInput) {
+      toast.error("Selecione um arquivo PDF para enviar");
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append("arquivo", fileInput);
+    fd.append("data_inicial", dataInicial);
+    fd.append("data_final", dataFinal);
+
+    try {
+      await api.files.upload(fd);
+      toast.success("Formulário anexado com sucesso!");
+      setOpenModal(false);
+      setFileInput(null);
+      setDataInicial("");
+      setDataFinal("");
+      carregar();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Erro ao anexar formulário");
+    }
+  }
+
+  function visualizar(id: string) {
+    const url = (import.meta.env.VITE_API_URL || "http://localhost:3000") + `/api/formularios/${id}/view`;
+    window.open(url, "_blank");
+  }
+
+  async function baixar(id: string, nome?: string) {
+    try {
+      await api.files.download(id);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao baixar arquivo");
+    }
+  }
+
+  async function excluir(id: string) {
+    if (!confirm("Deseja realmente excluir este arquivo?")) return;
+    try {
+      await api.files.delete(id);
+      toast.success("Arquivo excluído com sucesso");
+      carregar();
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao excluir arquivo");
+    }
+  }
+
+  return (
+    <MainLayout>
+      <PageHeader
+        title="Formulários"
+        description="Anexe, visualize e gerencie formulários em PDF"
+        action={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => { setFilterIni(""); setFilterFim(""); }}>
+              Limpar Filtros
+            </Button>
+
+            <Dialog open={openModal} onOpenChange={setOpenModal}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Anexar Formulário
+                </Button>
+              </DialogTrigger>
+              <form onSubmit={enviar}>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Anexar Formulário (PDF)</DialogTitle>
+                  </DialogHeader>
+
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Data Inicial</Label>
+                        <Input type="date" value={dataInicial} onChange={(e) => setDataInicial(e.target.value)} required />
+                      </div>
+                      <div>
+                        <Label>Data Final</Label>
+                        <Input type="date" value={dataFinal} onChange={(e) => setDataFinal(e.target.value)} required />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Arquivo (PDF)</Label>
+                      <input accept="application/pdf" onChange={(e) => setFileInput(e.target.files?.[0] ?? null)} type="file" className="mt-2" />
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setOpenModal(false)}>Cancelar</Button>
+                    <Button type="submit">Enviar</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </form>
+            </Dialog>
+          </div>
+        }
+      />
+
+      <Card className="mb-4">
+        <CardContent>
+          <div className="grid grid-cols-4 gap-4">
+            <div>
+              <Label>Data Inicial (Upload)</Label>
+              <Input type="date" value={filterIni} onChange={(e) => setFilterIni(e.target.value)} />
+            </div>
+            <div>
+              <Label>Data Final (Upload)</Label>
+              <Input type="date" value={filterFim} onChange={(e) => setFilterFim(e.target.value)} />
+            </div>
+            <div className="col-span-2 flex items-end justify-end">
+              <Button variant="ghost" onClick={() => { setFilterIni(""); setFilterFim(""); }}>
+                Limpar Filtros
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data Inicial</TableHead>
+                  <TableHead>Data Final</TableHead>
+                  <TableHead>Arquivo</TableHead>
+                  <TableHead>Upload</TableHead>
+                  <TableHead>Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow><TableCell colSpan={5}>Carregando...</TableCell></TableRow>
+                ) : filtrarLista().length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-muted-foreground text-center">Nenhum formulário encontrado</TableCell></TableRow>
+                ) : (
+                  filtrarLista().map((item) => (
+                    <TableRow key={item._id}>
+                      <TableCell>{item.data_inicial ? new Date(item.data_inicial + 'T00:00:00').toLocaleDateString() : '-'}</TableCell>
+                      <TableCell>{item.data_final ? new Date(item.data_final + 'T00:00:00').toLocaleDateString() : '-'}</TableCell>
+                      <TableCell>{item.filename}</TableCell>
+                      <TableCell>{item.uploadDate ? new Date(item.uploadDate).toLocaleDateString() : '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2 justify-center">
+                          <Button variant="ghost" size="icon" onClick={() => visualizar(item._id)}>
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => baixar(item._id, item.filename)}>
+                            <FileDown className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => excluir(item._id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </MainLayout>
+  );
+}

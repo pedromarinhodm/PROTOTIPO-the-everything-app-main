@@ -1,0 +1,187 @@
+/**
+ * Controller: File
+ * Endpoints para gerenciamento de arquivos no GridFS
+ */
+
+const { listFiles, getFromGridFS, deleteFromGridFS, saveToGridFS } = require('../gridfs/gridfsStorage');
+
+/**
+ * GET /api/files
+ * Lista todos os arquivos armazenados
+ */
+const getFiles = async (req, res) => {
+  try {
+    const files = await listFiles();
+    
+    const formattedFiles = files.map(file => ({
+      id: file._id.toString(),
+      filename: file.filename,
+      length: file.length,
+      uploadDate: file.uploadDate,
+      metadata: file.metadata,
+    }));
+
+    res.json({
+      success: true,
+      data: formattedFiles,
+      count: formattedFiles.length,
+    });
+  } catch (error) {
+    console.error('Erro ao listar arquivos:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao listar arquivos',
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * POST /api/files
+ * Upload de arquivo (PDF) com metadata `data_inicial` e `data_final`
+ */
+const uploadFile = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Nenhum arquivo enviado' });
+    }
+
+    // Aceita somente PDF
+    if (req.file.mimetype !== 'application/pdf') {
+      return res.status(400).json({ success: false, error: 'Apenas arquivos PDF são permitidos' });
+    }
+
+    const { data_inicial, data_final } = req.body;
+    const filename = Date.now() + '-' + req.file.originalname;
+
+    const fileId = await saveToGridFS(req.file.buffer, filename, {
+      data_inicial: data_inicial || null,
+      data_final: data_final || null,
+      uploadDate: new Date(),
+    });
+
+    res.status(201).json({ success: true, data: { id: fileId.toString(), filename } });
+  } catch (error) {
+    console.error('Erro ao fazer upload de arquivo:', error);
+    res.status(500).json({ success: false, error: 'Erro ao salvar arquivo', message: error.message });
+  }
+};
+
+/**
+ * GET /api/files/:id/view
+ * Visualiza PDF inline
+ */
+const viewFile = async (req, res) => {
+  try {
+    const { stream, file } = await getFromGridFS(req.params.id);
+
+    // Apenas PDFs suportados para visualização inline
+    const isPDF = (file.contentType && file.contentType === 'application/pdf') || (file.filename && file.filename.toLowerCase().endsWith('.pdf'));
+    if (!isPDF) {
+      return res.status(400).json({ success: false, error: 'Visualização apenas suportada para PDFs' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="' + file.filename + '"');
+
+    stream.pipe(res);
+
+    stream.on('error', (err) => {
+      console.error('Erro no stream:', err);
+      if (!res.headersSent) res.status(500).json({ success: false, error: 'Erro ao transmitir arquivo' });
+    });
+  } catch (error) {
+    console.error('Erro ao visualizar arquivo:', error);
+    if (error.message === 'Arquivo não encontrado') {
+      return res.status(404).json({ success: false, error: 'Arquivo não encontrado' });
+    }
+    res.status(500).json({ success: false, error: 'Erro ao visualizar arquivo', message: error.message });
+  }
+};
+/**
+ * GET /api/files/:id
+ * Download de um arquivo por ID
+ */
+const downloadFile = async (req, res) => {
+  try {
+    const { stream, file } = await getFromGridFS(req.params.id);
+    
+    // Define headers para download
+    res.setHeader('Content-Type', getContentType(file.filename));
+    res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+    res.setHeader('Content-Length', file.length);
+    
+    // Stream do arquivo
+    stream.pipe(res);
+    
+    stream.on('error', (error) => {
+      console.error('Erro no stream:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Erro ao baixar arquivo',
+      });
+    });
+  } catch (error) {
+    console.error('Erro ao baixar arquivo:', error);
+    
+    if (error.message === 'Arquivo não encontrado') {
+      return res.status(404).json({
+        success: false,
+        error: 'Arquivo não encontrado',
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao baixar arquivo',
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * DELETE /api/files/:id
+ * Deleta um arquivo
+ */
+const deleteFile = async (req, res) => {
+  try {
+    await deleteFromGridFS(req.params.id);
+    
+    res.json({
+      success: true,
+      message: 'Arquivo deletado com sucesso',
+    });
+  } catch (error) {
+    console.error('Erro ao deletar arquivo:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao deletar arquivo',
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Determina o Content-Type baseado na extensão
+ */
+const getContentType = (filename) => {
+  const ext = filename.split('.').pop().toLowerCase();
+  
+  const types = {
+    pdf: 'application/pdf',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    xls: 'application/vnd.ms-excel',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  };
+
+  return types[ext] || 'application/octet-stream';
+};
+
+module.exports = {
+  getFiles,
+  uploadFile,
+  viewFile,
+  downloadFile,
+  deleteFile,
+};

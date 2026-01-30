@@ -1,0 +1,87 @@
+/**
+ * Controller: Report
+ * Endpoints para geração de relatórios
+ */
+
+const reportService = require('../services/reportService');
+
+/**
+ * GET /api/reports/estoque/pdf
+ * Gera relatório de estoque em PDF
+ */
+const getStockPDF = async (req, res) => {
+  try {
+    const { fileId, filename, buffer } = await reportService.generateStockPDF();
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-File-Id', fileId.toString());
+    
+    res.send(buffer);
+  } catch (error) {
+    console.error('Erro ao gerar relatório de estoque:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao gerar relatório',
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * GET /api/reports/historico/pdf
+ * Gera relatório de histórico em PDF
+ */
+const getHistoryPDF = async (req, res) => {
+  try {
+    const { type, startDate, endDate } = req.query;
+    
+    const { fileId, filename, buffer } = await reportService.generateHistoryPDF({
+      type,
+      startDate,
+      endDate,
+    });
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-File-Id', fileId.toString());
+    
+    res.send(buffer);
+  } catch (error) {
+    console.error('Erro ao gerar relatório de histórico:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao gerar relatório',
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * GET /api/reports/excel
+ * Gera relatório completo em Excel
+ */
+const getExcelReport = async (req, res) => {
+  try {
+    const { fileId, filename, buffer } = await reportService.generateExcelReport();
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-File-Id', fileId.toString());
+    
+    res.send(buffer);
+  } catch (error) {
+    console.error('Erro ao gerar relatório Excel:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao gerar relatório',
+      message: error.message,
+    });
+  }
+};
+
+module.exports = {
+  getStockPDF,
+  getHistoryPDF,
+  getExcelReport,
+};
