@@ -16,8 +16,9 @@ export default function Entries() {
   const [formData, setFormData] = useState({
     produto: "",
     quantidade: "",
-    data: format(new Date(), "yyyy-MM-dd"),
     observacoes: "",
+    servidor_almoxarifado: "",
+    data_entrada: format(new Date(), "yyyy-MM-dd"),
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,8 +27,9 @@ export default function Entries() {
     setFormData({
       produto: "",
       quantidade: "",
-      data: format(new Date(), "yyyy-MM-dd"),
       observacoes: "",
+      servidor_almoxarifado: "",
+      data_entrada: format(new Date(), "yyyy-MM-dd"),
     });
   };
 
@@ -42,7 +44,11 @@ export default function Entries() {
       toast.error("Informe uma quantidade válida");
       return;
     }
-    if (!formData.data) {
+    if (!formData.servidor_almoxarifado.trim()) {
+      toast.error("Informe o servidor do almoxarifado");
+      return;
+    }
+    if (!formData.data_entrada) {
       toast.error("Informe a data da entrada");
       return;
     }
@@ -50,11 +56,12 @@ export default function Entries() {
     setIsSubmitting(true);
 
     try {
-      await api.movements.createSimplifiedEntry({
-        produto: formData.produto.trim(),
+      await api.movements.createEntry({
+        descricao: formData.produto.trim(),
         quantidade: parseInt(formData.quantidade),
-        data: formData.data,
-        observacoes: formData.observacoes.trim() || undefined,
+        unidade: "unidade", // Default unit
+        servidor_almoxarifado: formData.servidor_almoxarifado.trim(),
+        data_entrada: formData.data_entrada,
       });
 
       toast.success(
@@ -124,17 +131,6 @@ export default function Entries() {
                         setFormData({ ...formData, quantidade: e.target.value })
                       }
                       placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="data">Data *</Label>
-                    <Input
-                      id="data"
-                      type="date"
-                      value={formData.data}
-                      onChange={(e) =>
-                        setFormData({ ...formData, data: e.target.value })
-                      }
                     />
                   </div>
                 </div>
