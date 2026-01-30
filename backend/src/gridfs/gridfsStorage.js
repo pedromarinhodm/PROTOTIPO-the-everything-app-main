@@ -3,8 +3,8 @@
  * Configuração para armazenamento de arquivos no MongoDB
  */
 
-const mongoose = require('mongoose');
-const { GridFSBucket } = require('mongodb');
+import mongoose from 'mongoose';
+import { GridFSBucket } from 'mongodb';
 
 let bucket;
 
@@ -105,7 +105,7 @@ const deleteFromGridFS = async (fileId) => {
   console.log(`🗑️ Arquivo deletado do GridFS: ${fileId}`);
 };
 
-module.exports = {
+export default {
   initGridFS,
   getBucket,
   saveToGridFS,

@@ -3,7 +3,7 @@
  * Endpoints para geração de relatórios
  */
 
-const reportService = require('../services/reportService');
+import reportService from '../services/reportService.js';
 
 /**
  * GET /api/reports/estoque/pdf
@@ -80,7 +80,7 @@ const getExcelReport = async (req, res) => {
   }
 };
 
-module.exports = {
+export default {
   getStockPDF,
   getHistoryPDF,
   getExcelReport,

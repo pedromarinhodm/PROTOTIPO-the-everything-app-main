@@ -71,9 +71,15 @@ export interface Movement {
   _id: string;
   id: string;
   produto: string;
+  produto_id: {
+    descricao: string;
+  };
   tipo: 'entrada' | 'saida';
   quantidade: number;
   data: string;
+  servidor_almoxarifado?: string;
+  setor_responsavel?: string;
+  servidor_retirada?: string;
   observacoes?: string;
   createdAt: string;
 }
@@ -254,7 +260,7 @@ export const dashboardAPI = {
     const totalProducts = products.length;
     const totalEntries = movements.filter(m => m.tipo === 'entrada').length;
     const totalExits = movements.filter(m => m.tipo === 'saida').length;
-    const lowStockProducts = products.filter(p => p.quantidade <= 10).length;
+    const lowStockProducts = products.filter(p => p.quantidade <= 5).length;
     const totalMovements = movements.length;
 
     return {
@@ -287,19 +293,58 @@ export const dashboardAPI = {
 
 export const reportsAPI = {
   /**
-   * Gera e baixa relatório de estoque em PDF (não implementado no backend)
+   * Gera e baixa relatório de estoque em PDF
    */
   async downloadStockPDF(): Promise<void> {
-    // TODO: Implement PDF generation
-    throw new Error('Relatório PDF não implementado');
+    const response = await fetch(`${API_BASE_URL}/api/reports/estoque/pdf`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao gerar relatório PDF');
+    }
+
+    // Cria um blob e força o download
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'relatorio-estoque.pdf';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   },
 
   /**
-   * Gera e baixa relatório de histórico em PDF (não implementado no backend)
+   * Gera e baixa relatório de histórico em PDF
    */
   async downloadHistoryPDF(filters?: { type?: string; startDate?: string; endDate?: string }): Promise<void> {
-    // TODO: Implement PDF generation
-    throw new Error('Relatório PDF não implementado');
+    const params = new URLSearchParams();
+    if (filters?.type) params.append('type', filters.type);
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+
+    const url = `${API_BASE_URL}/api/reports/historico/pdf${params.toString() ? '?' + params.toString() : ''}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao gerar relatório PDF');
+    }
+
+    // Cria um blob e força o download
+    const blob = await response.blob();
+    const urlBlob = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = urlBlob;
+    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'relatorio-historico.pdf';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(urlBlob);
+    document.body.removeChild(a);
   },
 
   /**

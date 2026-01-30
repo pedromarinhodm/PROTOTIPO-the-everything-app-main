@@ -149,17 +149,17 @@ export default function Dashboard() {
               <div className="space-y-3">
                 {lowStockProducts.map((product) => (
                   <div
-                    key={product.id}
+                    key={product._id}
                     className="flex items-center justify-between rounded-lg border border-warning/30 bg-warning/5 p-3"
                   >
                     <div>
-                      <p className="font-medium text-sm">{product.description}</p>
+                      <p className="font-medium text-sm">{product.descricao}</p>
                       <p className="text-xs text-muted-foreground">
-                        Código: {product.code}
+                        Código: {product.codigo}
                       </p>
                     </div>
                     <Badge variant="outline" className="border-warning text-warning">
-                      {product.quantity} {product.unit}
+                      {product.quantidade} {product.unidade}
                     </Badge>
                   </div>
                 ))}

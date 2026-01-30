@@ -3,9 +3,10 @@
  * Rotas da API de relatórios
  */
 
-const express = require('express');
+import express from 'express';
+import reportController from '../controllers/reportController.js';
+
 const router = express.Router();
-const reportController = require('../controllers/reportController');
 
 // GET /api/reports/estoque/pdf - Relatório de estoque em PDF
 router.get('/estoque/pdf', reportController.getStockPDF);
@@ -16,4 +17,4 @@ router.get('/historico/pdf', reportController.getHistoryPDF);
 // GET /api/reports/excel - Relatório completo em Excel
 router.get('/excel', reportController.getExcelReport);
 
-module.exports = router;
+export default router;

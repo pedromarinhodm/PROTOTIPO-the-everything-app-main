@@ -2,6 +2,7 @@
   "name": "scges-backend",
   "version": "1.0.0",
   "description": "Backend do Sistema de Controle e Gerenciamento de Estoque - SCGES",
+  "type": "module",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

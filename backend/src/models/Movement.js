@@ -3,38 +3,28 @@
  * Representa as movimentações de estoque (entradas e saídas)
  */
 
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
-const movementSchema = new mongoose.Schema({
-  // Tipo de movimentação
-  tipo: {
-    type: String,
-    enum: ['entrada', 'saida'],
-    required: true,
+const movementSchema = new mongoose.Schema(
+  {
+    tipo: { type: String, enum: ["entrada", "saida"], required: true },
+    quantidade: { type: Number, required: true },
+    servidor_almoxarifado: { type: String, required: true },
+    setor_responsavel: { type: String },
+    servidor_retirada: { type: String },
+    // ✅ Correção: grava data local ajustada para fuso horário
+    data: {
+      type: Date,
+      default: Date.now,
+    },
+    produto_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Produto",
+      required: true,
+    },
   },
-  // Produto (nome ou descrição)
-  produto: {
-    type: String,
-    required: true,
-  },
-  // Quantidade movimentada
-  quantidade: {
-    type: Number,
-    required: true,
-  },
-  // Data da movimentação
-  data: {
-    type: Date,
-    default: Date.now,
-  },
-  // Observações
-  observacoes: {
-    type: String,
-    default: "",
-  },
-}, {
-  timestamps: true,
-});
+  { timestamps: true },
+)
 
 // Índices para melhorar a performance
 movementSchema.index({ produto_id: 1 });
@@ -51,4 +41,4 @@ movementSchema.virtual('formattedDate').get(function() {
 movementSchema.set('toJSON', { virtuals: true });
 movementSchema.set('toObject', { virtuals: true });
 
-module.exports = mongoose.model('Movimentacao', movementSchema);
+export default mongoose.model('Movimentacao', movementSchema);

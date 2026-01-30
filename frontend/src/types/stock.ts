@@ -1,6 +1,5 @@
 export interface Product {
   _id: string;
-  id: string;
   codigo: number;
   descricao: string;
   quantidade: number;
@@ -16,11 +15,15 @@ export interface Product {
 
 export interface Movement {
   _id: string;
-  id: string;
-  produto: string;
+  produto_id: {
+    descricao: string;
+  };
   tipo: 'entrada' | 'saida';
   quantidade: number;
   data: string;
+  servidor_almoxarifado?: string;
+  setor_responsavel?: string;
+  servidor_retirada?: string;
   observacoes?: string;
   createdAt: string;
 }

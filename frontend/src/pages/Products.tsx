@@ -13,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -34,7 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Search, Pencil, Trash2, Package, FileText, Eye } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Package, FileText, Eye, Download } from "lucide-react";
 import { toast } from "sonner";
 
 type ProductFormData = {
@@ -145,7 +144,6 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
@@ -201,48 +199,6 @@ export default function Products() {
     });
   };
 
-  // Busca o próximo código no backend sempre que o modal de adicionar for aberto
-  React.useEffect(() => {
-    let mounted = true;
-    if (isAddDialogOpen) {
-      setNextProductCode(null);
-      api.products.getNextCode().then((code) => {
-        if (mounted) setNextProductCode(code);
-      }).catch(() => {
-        if (mounted) setNextProductCode(null);
-      });
-    }
-    return () => {
-      mounted = false;
-    };
-  }, [isAddDialogOpen]);
-
-  const handleAdd = async () => {
-    if (!formData.descricao.trim() || !formData.quantidade) {
-      toast.error("Preencha os campos obrigatórios");
-      return;
-    }
-
-    try {
-      const newProduct = await api.products.create({
-        descricao: formData.descricao,
-        quantidade: parseInt(formData.quantidade),
-        unidade: formData.unidade,
-        descricao_complementar: formData.descricao_complementar || undefined,
-        validade: formData.validade || undefined,
-        fornecedor: formData.fornecedor || undefined,
-        numero_processo: formData.numero_processo || undefined,
-        observacoes: formData.observacoes || undefined,
-      });
-
-      setProducts(prev => [...prev, newProduct]);
-      toast.success("Produto cadastrado com sucesso!");
-      setIsAddDialogOpen(false);
-      resetForm();
-    } catch (error) {
-      toast.error("Erro ao cadastrar produto");
-    }
-  };
 
   const handleEdit = async () => {
     if (!editingProduct || !formData.descricao.trim()) {
@@ -313,32 +269,17 @@ export default function Products() {
         title="Gestão de Produtos"
         description="Cadastre, edite e gerencie os produtos do estoque"
         action={
-          <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-            setIsAddDialogOpen(open);
-            if (!open) resetForm();
+          <Button onClick={async () => {
+            try {
+              await api.reports.downloadStockPDF();
+              toast.success("Relatório gerado com sucesso!");
+            } catch (error) {
+              toast.error("Erro ao gerar relatório");
+            }
           }}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Novo Produto
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Cadastrar Novo Produto</DialogTitle>
-                <DialogDescription>
-                  O código será gerado automaticamente.
-                </DialogDescription>
-              </DialogHeader>
-              <ProductForm formData={formData} setFormData={setFormData} />
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleAdd}>Cadastrar</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            <Download className="mr-2 h-4 w-4" />
+            Gerar Relatório
+          </Button>
         }
       />
 
@@ -369,23 +310,23 @@ export default function Products() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+              <Table className="border">
+                <TableHeader className="bg-gray-50">
                   <TableRow>
-                    <TableHead className="w-20">Código</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead className="w-24 text-center">Qtd</TableHead>
-                    <TableHead className="w-20">Unidade</TableHead>
-                    <TableHead>Fornecedor</TableHead>
-                    <TableHead className="w-32 text-right">Ações</TableHead>
+                    <TableHead className="w-20 text-center align-middle text-primary">Código</TableHead>
+                    <TableHead className="text-center align-middle text-primary">Descrição</TableHead>
+                    <TableHead className="w-24 text-center align-middle text-primary">Qtd</TableHead>
+                    <TableHead className="w-20 text-center align-middle text-primary">Unidade</TableHead>
+                    <TableHead className="text-center align-middle text-primary">Fornecedor</TableHead>
+                    <TableHead className="w-32 text-center align-middle text-primary">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredProducts.map((product) => (
-                    <TableRow key={product._id}>
-                      <TableCell className="font-mono text-sm">{product.codigo}</TableCell>
-                      <TableCell className="font-medium">{product.descricao}</TableCell>
-                      <TableCell className="text-center">
+                    <TableRow key={product._id} className="hover:bg-muted/50">
+                      <TableCell className="font-mono text-sm text-center align-middle">{product.codigo}</TableCell>
+                      <TableCell className="font-medium text-center align-middle">{product.descricao}</TableCell>
+                      <TableCell className="text-center align-middle">
                         <span
                           className={
                             product.quantidade <= 10
@@ -396,12 +337,12 @@ export default function Products() {
                           {product.quantidade}
                         </span>
                       </TableCell>
-                      <TableCell>{product.unidade}</TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-center align-middle">{product.unidade}</TableCell>
+                      <TableCell className="text-muted-foreground text-center align-middle">
                         {product.fornecedor || "-"}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-2">
+                      <TableCell className="text-center align-middle">
+                        <div className="flex items-center justify-center gap-2">
                           <Button
                             variant="ghost"
                             size="icon"

@@ -193,29 +193,29 @@ export default function Formularios() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
+            <Table className="border">
+              <TableHeader className="bg-gray-50">
                 <TableRow>
-                  <TableHead>Data Inicial</TableHead>
-                  <TableHead>Data Final</TableHead>
-                  <TableHead>Arquivo</TableHead>
-                  <TableHead>Upload</TableHead>
-                  <TableHead>Ações</TableHead>
+                  <TableHead className="text-center align-middle text-primary">Data Inicial</TableHead>
+                  <TableHead className="text-center align-middle text-primary">Data Final</TableHead>
+                  <TableHead className="text-center align-middle text-primary">Arquivo</TableHead>
+                  <TableHead className="text-center align-middle text-primary">Upload</TableHead>
+                  <TableHead className="text-center align-middle text-primary">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={5}>Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center align-middle">Carregando...</TableCell></TableRow>
                 ) : filtrarLista().length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-muted-foreground text-center">Nenhum formulário encontrado</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-muted-foreground text-center align-middle">Nenhum formulário encontrado</TableCell></TableRow>
                 ) : (
                   filtrarLista().map((item) => (
-                    <TableRow key={item._id}>
-                      <TableCell>{item.data_inicial ? new Date(item.data_inicial + 'T00:00:00').toLocaleDateString() : '-'}</TableCell>
-                      <TableCell>{item.data_final ? new Date(item.data_final + 'T00:00:00').toLocaleDateString() : '-'}</TableCell>
-                      <TableCell>{item.filename}</TableCell>
-                      <TableCell>{item.uploadDate ? new Date(item.uploadDate).toLocaleDateString() : '-'}</TableCell>
-                      <TableCell>
+                    <TableRow key={item._id} className="hover:bg-muted/50">
+                      <TableCell className="text-center align-middle">{item.data_inicial ? new Date(item.data_inicial + 'T00:00:00').toLocaleDateString() : '-'}</TableCell>
+                      <TableCell className="text-center align-middle">{item.data_final ? new Date(item.data_final + 'T00:00:00').toLocaleDateString() : '-'}</TableCell>
+                      <TableCell className="text-center align-middle">{item.filename}</TableCell>
+                      <TableCell className="text-center align-middle">{item.uploadDate ? new Date(item.uploadDate).toLocaleDateString() : '-'}</TableCell>
+                      <TableCell className="text-center align-middle">
                         <div className="flex gap-2 justify-center">
                           <Button variant="ghost" size="icon" onClick={() => visualizar(item._id)}>
                             <FileText className="h-4 w-4" />

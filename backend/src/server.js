@@ -7,6 +7,13 @@ import { fileURLToPath } from "url"
 import multer from "multer";
 import { ObjectId } from "mongodb";
 
+// Import models
+import Produto from './models/Product.js';
+import Movimentacao from './models/Movement.js';
+
+// Import routes
+import reportRoutes from './routes/reportRoutes.js';
+
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -42,46 +49,8 @@ mongoose.connection.once("open", () => {
 
 
 // =====================================
-// 🧩 Modelos (Schemas)
+// 🧩 Modelos (Schemas) - Importados dos arquivos de modelo
 // =====================================
-const produtoSchema = new mongoose.Schema(
-  {
-    codigo: { type: Number, unique: true },
-    descricao: { type: String, required: true, trim: true },
-    quantidade: { type: Number, required: true, default: 0 },
-    unidade: { type: String, default: "" },
-    descricao_complementar: { type: String, default: "" },
-    validade: { type: String, default: "" },
-    fornecedor: { type: String, default: "" },
-    numero_processo: { type: String, default: "" },
-    observacoes: { type: String, default: "" },
-  },
-  { timestamps: true },
-)
-
-const movimentacaoSchema = new mongoose.Schema(
-  {
-    tipo: { type: String, enum: ["entrada", "saida"], required: true },
-    quantidade: { type: Number, required: true },
-    servidor_almoxarifado: { type: String, required: true },
-    setor_responsavel: { type: String },
-    servidor_retirada: { type: String },
-    // ✅ Correção: grava data local ajustada para fuso horário
-    data: {
-      type: Date,
-      default: Date.now,
-    },
-    produto_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Produto",
-      required: true,
-    },
-  },
-  { timestamps: true },
-)
-
-const Produto = mongoose.model("Produto", produtoSchema)
-const Movimentacao = mongoose.model("Movimentacao", movimentacaoSchema)
 
 // =====================================
 // ⚙️ Configurações do servidor
@@ -439,10 +408,10 @@ app.delete("/api/formularios/:id", async (req, res) => {
   }
 });
 
-
-
-
-
+// =====================================
+// 📊 Rotas de Relatórios
+// =====================================
+app.use('/api/reports', reportRoutes);
 
 // =====================================
 // 🚀 Servidor

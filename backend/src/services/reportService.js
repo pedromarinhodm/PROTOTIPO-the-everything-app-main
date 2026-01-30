@@ -3,11 +3,11 @@
  * Geração de relatórios em PDF e Excel
  */
 
-const PDFDocument = require('pdfkit');
-const ExcelJS = require('exceljs');
-const Product = require('../models/Product');
-const Movement = require('../models/Movement');
-const { saveToGridFS } = require('../gridfs/gridfsStorage');
+import PDFDocument from 'pdfkit';
+import ExcelJS from 'exceljs';
+import Product from '../models/Product.js';
+import Movement from '../models/Movement.js';
+import gridfs from '../gridfs/gridfsStorage.js';
 
 /**
  * Gera relatório de estoque em PDF
@@ -25,7 +25,7 @@ const generateStockPDF = async () => {
       
       // Salva no GridFS
       const filename = `relatorio-estoque-${new Date().toISOString().split('T')[0]}.pdf`;
-      const fileId = await saveToGridFS(buffer, filename, {
+      const fileId = await gridfs.saveToGridFS(buffer, filename, {
         type: 'stock-report',
         format: 'pdf',
         generatedAt: new Date(),
@@ -308,7 +308,7 @@ const generateExcelReport = async () => {
   
   // Salva no GridFS
   const filename = `relatorio-completo-${new Date().toISOString().split('T')[0]}.xlsx`;
-  const fileId = await saveToGridFS(Buffer.from(buffer), filename, {
+  const fileId = await gridfs.saveToGridFS(Buffer.from(buffer), filename, {
     type: 'full-report',
     format: 'xlsx',
     generatedAt: new Date(),
@@ -317,7 +317,7 @@ const generateExcelReport = async () => {
   return { fileId, filename, buffer: Buffer.from(buffer) };
 };
 
-module.exports = {
+export default {
   generateStockPDF,
   generateHistoryPDF,
   generateExcelReport,

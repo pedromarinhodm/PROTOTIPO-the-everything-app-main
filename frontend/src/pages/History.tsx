@@ -93,19 +93,16 @@ export default function History() {
     });
   };
 
-  const exportToPDF = () => {
-    // Simple text export for now
-    const content = filteredMovements.map((m) =>
-      `${format(new Date(m.data), "dd/MM/yyyy")} | ${m.tipo.toUpperCase()} | ${m.produto} | Qtd: ${m.quantidade} | Obs: ${m.observacoes || ''}`
-    ).join("\n");
-
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `historico-movimentacoes-${format(new Date(), "yyyy-MM-dd")}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportToPDF = async () => {
+    try {
+      await api.reports.downloadHistoryPDF({
+        type: filter.tipo !== "all" ? filter.tipo : undefined,
+        startDate: filter.startDate || undefined,
+        endDate: filter.endDate || undefined,
+      });
+    } catch (error) {
+      console.error("Erro ao gerar relatório PDF:", error);
+    }
   };
 
   return (
@@ -256,23 +253,24 @@ export default function History() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+              <Table className="border">
+                <TableHeader className="bg-gray-50">
                   <TableRow>
-                    <TableHead className="w-28">Data</TableHead>
-                    <TableHead className="w-24">Tipo</TableHead>
-                    <TableHead>Produto</TableHead>
-                    <TableHead className="w-20 text-center">Qtd</TableHead>
-                    <TableHead>Observações</TableHead>
+                    <TableHead className="w-28 text-center align-middle text-primary">Data</TableHead>
+                    <TableHead className="w-24 text-center align-middle text-primary">Tipo</TableHead>
+                    <TableHead className="text-center align-middle text-primary">Produto</TableHead>
+                    <TableHead className="w-20 text-center align-middle text-primary">Qtd</TableHead>
+                    <TableHead className="text-center align-middle text-primary">Servidor Almoxarifado</TableHead>
+                    <TableHead className="text-center align-middle text-primary">Setor / Servidor Retirada</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredMovements.map((movement) => (
-                    <TableRow key={movement._id}>
-                      <TableCell className="text-sm">
+                    <TableRow key={movement._id} className="hover:bg-muted/50">
+                      <TableCell className="text-sm text-center align-middle">
                         {format(new Date(movement.data), "dd/MM/yyyy", { locale: ptBR })}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center align-middle">
                         <Badge
                           variant={movement.tipo === "entrada" ? "default" : "secondary"}
                           className={
@@ -289,16 +287,16 @@ export default function History() {
                           {movement.tipo}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium text-center align-middle">
                         {movement.produto_id.descricao}
                       </TableCell>
-                      <TableCell className="text-center font-semibold">
+                      <TableCell className="text-center font-semibold align-middle">
                         {movement.tipo === "entrada" ? "+" : "-"}{movement.quantidade}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-muted-foreground text-center align-middle">
                         {movement.servidor_almoxarifado}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-muted-foreground text-center align-middle">
                         {movement.setor_responsavel
                           ? `${movement.setor_responsavel} / ${movement.servidor_retirada}`
                           : "-"}
