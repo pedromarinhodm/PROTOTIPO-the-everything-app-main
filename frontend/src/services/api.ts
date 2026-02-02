@@ -330,11 +330,12 @@ export const reportsAPI = {
   /**
    * Gera e baixa relatório de histórico em PDF
    */
-  async downloadHistoryPDF(filters?: { type?: string; startDate?: string; endDate?: string }): Promise<void> {
+  async downloadHistoryPDF(filters?: { type?: string; startDate?: string; endDate?: string; search?: string }): Promise<void> {
     const params = new URLSearchParams();
     if (filters?.type) params.append('type', filters.type);
     if (filters?.startDate) params.append('startDate', filters.startDate);
     if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.search) params.append('search', filters.search);
 
     const url = `${API_BASE_URL}/api/reports/historico/pdf${params.toString() ? '?' + params.toString() : ''}`;
 

@@ -33,12 +33,13 @@ const getStockPDF = async (req, res) => {
  */
 const getHistoryPDF = async (req, res) => {
   try {
-    const { type, startDate, endDate } = req.query;
+    const { type, startDate, endDate, search } = req.query;
 
     const { filename, buffer } = await reportService.generateHistoryPDF({
       type,
       startDate,
       endDate,
+      search,
     });
 
     res.setHeader('Content-Type', 'application/pdf');

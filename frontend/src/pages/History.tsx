@@ -100,6 +100,7 @@ export default function History() {
         type: filter.tipo !== "all" ? filter.tipo : undefined,
         startDate: filter.startDate || undefined,
         endDate: filter.endDate || undefined,
+        search: filter.search || undefined,
       });
       toast.success("Relatório gerado com sucesso!");
     } catch (error) {

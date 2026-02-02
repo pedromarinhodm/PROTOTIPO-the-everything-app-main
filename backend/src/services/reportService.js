@@ -100,21 +100,72 @@ const generateStockPDF = async () => {
  * Gera relatório de histórico em PDF
  */
 const generateHistoryPDF = async (filters = {}) => {
-  let query = {};
+  const { type, startDate, endDate } = filters;
 
-  if (filters.type && filters.type !== 'all') {
-    query.tipo = filters.type;
-  }
-  if (filters.startDate) {
-    query.data = { $gte: new Date(filters.startDate) };
-  }
-  if (filters.endDate) {
-    const end = new Date(filters.endDate);
-    end.setHours(23, 59, 59, 999);
-    query.data = { ...query.data, $lte: end };
+  let matchConditions = {};
+
+  // Filtro por tipo
+  if (type && type !== 'all') {
+    matchConditions.tipo = type;
   }
 
-  const movements = await Movement.find(query).populate('produto_id', 'codigo descricao').sort({ data: -1 });
+  // Filtro por data
+  if (startDate || endDate) {
+    matchConditions.data = {};
+    if (startDate) {
+      matchConditions.data.$gte = new Date(startDate);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      matchConditions.data.$lte = end;
+    }
+  }
+
+  // Usar a mesma lógica de filtragem do endpoint de movimentações
+  let movements;
+  if (!filters.search && Object.keys(matchConditions).length === 0) {
+    // Query simples para melhor performance quando não há filtros
+    movements = await Movement.find()
+      .populate("produto_id", "codigo descricao")
+      .sort({ data: -1, createdAt: -1 });
+  } else {
+    // Pipeline de agregação para filtros complexos
+    let pipeline = [
+      {
+        $lookup: {
+          from: 'produtos',
+          localField: 'produto_id',
+          foreignField: '_id',
+          as: 'produto_id'
+        }
+      },
+      {
+        $unwind: '$produto_id'
+      }
+    ];
+
+    // Adicionar filtro de busca se fornecido
+    if (filters.search) {
+      pipeline.push({
+        $match: {
+          ...matchConditions,
+          'produto_id.descricao': { $regex: filters.search, $options: 'i' }
+        }
+      });
+    } else if (Object.keys(matchConditions).length > 0) {
+      pipeline.push({
+        $match: matchConditions
+      });
+    }
+
+    // Ordenação
+    pipeline.push({
+      $sort: { data: -1, createdAt: -1 }
+    });
+
+    movements = await Movement.aggregate(pipeline);
+  }
   
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50 });
@@ -151,7 +202,35 @@ const generateHistoryPDF = async (filters = {}) => {
        .text(`Entradas: ${entries.length} (${totalEntriesQty} unidades)`)
        .text(`Saídas: ${exits.length} (${totalExitsQty} unidades)`)
        .text(`Saldo: ${totalEntriesQty - totalExitsQty} unidades`);
-    
+
+    doc.moveDown(2);
+
+    // Filtros Aplicados
+    doc.fontSize(12).font('Helvetica-Bold').text('Filtros Aplicados:');
+    doc.fontSize(10).font('Helvetica');
+
+    const appliedFilters = [];
+    if (filters.search) {
+      appliedFilters.push(`Busca: "${filters.search}"`);
+    }
+    if (type && type !== 'all') {
+      appliedFilters.push(`Tipo: ${type === 'entrada' ? 'Entradas' : 'Saídas'}`);
+    }
+    if (startDate) {
+      appliedFilters.push(`Data Inicial: ${new Date(startDate).toLocaleDateString('pt-BR')}`);
+    }
+    if (endDate) {
+      appliedFilters.push(`Data Final: ${new Date(endDate).toLocaleDateString('pt-BR')}`);
+    }
+
+    if (appliedFilters.length > 0) {
+      appliedFilters.forEach(filter => {
+        doc.text(`• ${filter}`);
+      });
+    } else {
+      doc.text('• Nenhum');
+    }
+
     doc.moveDown(2);
 
     // Lista de movimentações
