@@ -1,73 +1,101 @@
-# Welcome to your Lovable project
+# SCGES - Sistema de Controle e Gerenciamento de Estoque
 
-## Project info
+Sistema completo para controle e gerenciamento de estoque do almoxarifado da SEMSC (Secretaria Municipal de Segurança Comunitária).
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 📋 Visão Geral
 
-## How can I edit this code?
+O SCGES é um sistema fullstack composto por:
 
-There are several ways of editing your application.
+- **Frontend**: React + Vite + TypeScript + Tailwind CSS
+- **Backend**: Node.js + Express + Mongoose
+- **Banco de Dados**: MongoDB local
+- **Armazenamento de Arquivos**: MongoDB GridFS
 
-**Use Lovable**
+## 🚀 Funcionalidades
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Gestão de Produtos
+- Cadastro, edição e exclusão de produtos
+- Busca por descrição, código ou fornecedor
+- Geração automática de códigos sequenciais
+- Alerta de estoque baixo (≤5 unidades)
 
-Changes made via Lovable will be committed automatically to this repo.
+### Controle de Movimentações
+- Registro de entradas de materiais
+- Registro de saídas com controle de requisitante
+- Validação de estoque disponível
+- Histórico completo com filtros avançados
 
-**Use your preferred IDE**
+### Relatórios
+- Relatório de estoque em PDF
+- Relatório de histórico em PDF
+- Relatório completo em Excel
+- Armazenamento persistente em GridFS
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Dashboard
+- Total de produtos cadastrados
+- Total de entradas e saídas
+- Alertas de estoque baixo
+- Movimentações recentes
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## ⚙️ Pré-requisitos
 
-Follow these steps:
+1. **Node.js** (v18 ou superior)
+   - Download: https://nodejs.org/
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+2. **MongoDB** (v7.0 ou superior)
+   - Download: https://www.mongodb.com/try/download/community
+   - Extraia para a pasta `mongodb` na raiz do projeto
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🛠️ Instalação
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 1. Clone ou extraia o projeto
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+cd scges
 ```
 
-**Edit a file directly in GitHub**
+### 2. Configure o MongoDB
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Baixe o MongoDB Community Server e extraia na estrutura:
 
-**Use GitHub Codespaces**
+```
+mongodb/
+├── bin/
+│   ├── mongod.exe
+│   └── mongos.exe
+└── data/db/           # Crie esta pasta vazia
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### 3. Instale as dependências
 
-## What technologies are used for this project?
+**Backend:**
+```bash
+cd backend
+npm install
+```
 
-This project is built with:
+**Frontend:**
+```bash
+cd ..
+npm install
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### 4. Configure as variáveis de ambiente
 
-## How can I deploy this project?
+O arquivo `backend/.env` já está configurado para MongoDB local:
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```env
+MONGODB_URI=mongodb://127.0.0.1:27017/scges
+PORT=3001
+NODE_ENV=development
+```
 
-## Can I connect a custom domain to my Lovable project?
+## ▶️ Executando o Sistema
 
-Yes, you can!
+### Opção 1: Script Automático (Windows)
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Clique duas vezes em `iniciar.bat` para:
+1. Iniciar o MongoDB
+2. Iniciar o backend
+3. Iniciar o frontend
+4. Abrir o navegador automaticamente
