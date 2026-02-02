@@ -158,10 +158,85 @@ app.delete("/api/produtos/:id", async (req, res) => {
 // =====================================
 app.get("/api/movimentacoes", async (req, res) => {
   try {
-    const movs = await Movimentacao.find()
-    .populate("produto_id", "codigo descricao")
-    .sort({ data: -1, createdAt: -1 })
-    res.json(movs)
+    const { search, tipo, startDate, endDate, limit } = req.query;
+
+    let matchConditions = {};
+
+    // Filtro por tipo
+    if (tipo && tipo !== 'all') {
+      matchConditions.tipo = tipo;
+    }
+
+    // Filtro por data
+    if (startDate || endDate) {
+      matchConditions.data = {};
+      if (startDate) {
+        matchConditions.data.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        matchConditions.data.$lte = end;
+      }
+    }
+
+    // Se não há filtros, usar query simples para melhor performance
+    if (!search && Object.keys(matchConditions).length === 0) {
+      let query = Movimentacao.find()
+        .populate("produto_id", "codigo descricao")
+        .sort({ data: -1, createdAt: -1 });
+
+      if (limit) {
+        query = query.limit(parseInt(limit));
+      }
+
+      const movs = await query;
+      return res.json(movs);
+    }
+
+    // Construir pipeline de agregação apenas quando necessário
+    let pipeline = [
+      {
+        $lookup: {
+          from: 'produtos',
+          localField: 'produto_id',
+          foreignField: '_id',
+          as: 'produto_id'
+        }
+      },
+      {
+        $unwind: '$produto_id'
+      }
+    ];
+
+    // Adicionar filtro de busca se fornecido
+    if (search) {
+      pipeline.push({
+        $match: {
+          ...matchConditions,
+          'produto_id.descricao': { $regex: search, $options: 'i' }
+        }
+      });
+    } else if (Object.keys(matchConditions).length > 0) {
+      pipeline.push({
+        $match: matchConditions
+      });
+    }
+
+    // Ordenação
+    pipeline.push({
+      $sort: { data: -1, createdAt: -1 }
+    });
+
+    // Limitação se especificada
+    if (limit) {
+      pipeline.push({
+        $limit: parseInt(limit)
+      });
+    }
+
+    const movs = await Movimentacao.aggregate(pipeline);
+    res.json(movs);
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

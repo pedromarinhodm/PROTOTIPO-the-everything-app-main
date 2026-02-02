@@ -13,7 +13,7 @@ async function fetchAPI<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
   };
@@ -28,7 +28,7 @@ async function fetchAPI<T>(
 
   try {
     const response = await fetch(url, config);
-    
+
     // Para downloads de arquivos, retorna a resposta diretamente
     if (options.headers && (options.headers as Record<string, string>)['Accept'] === 'application/octet-stream') {
       if (!response.ok) {
@@ -38,7 +38,7 @@ async function fetchAPI<T>(
     }
 
     const data = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(data.message || data.error || 'Erro na requisição');
     }
@@ -202,7 +202,18 @@ export const movementsAPI = {
    * Lista movimentações com filtros
    */
   async getAll(filters?: MovementFilters): Promise<Movement[]> {
-    const response = await fetchAPI<Movement[]>('/api/movimentacoes');
+    const params = new URLSearchParams();
+
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.tipo && filters.tipo !== 'all') params.append('tipo', filters.tipo);
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.limit) params.append('limit', filters.limit.toString());
+
+    const queryString = params.toString();
+    const endpoint = queryString ? `/api/movimentacoes?${queryString}` : '/api/movimentacoes';
+
+    const response = await fetchAPI<Movement[]>(endpoint);
     return response;
   },
 

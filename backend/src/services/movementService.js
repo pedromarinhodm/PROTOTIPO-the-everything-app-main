@@ -85,38 +85,68 @@ const createExit = async (exitData) => {
 const getMovements = async (filters = {}) => {
   const { search, tipo, startDate, endDate, limit } = filters;
 
-  let query = {};
+  let matchConditions = {};
 
   // Filtro por tipo
   if (tipo && tipo !== 'all') {
-    query.tipo = tipo;
-  }
-
-  // Filtro por busca no produto
-  if (search) {
-    query.produto = { $regex: search, $options: 'i' };
+    matchConditions.tipo = tipo;
   }
 
   // Filtro por data
   if (startDate || endDate) {
-    query.data = {};
+    matchConditions.data = {};
     if (startDate) {
-      query.data.$gte = new Date(startDate);
+      matchConditions.data.$gte = new Date(startDate);
     }
     if (endDate) {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
-      query.data.$lte = end;
+      matchConditions.data.$lte = end;
     }
   }
 
-  let queryBuilder = Movement.find(query).sort({ data: -1, createdAt: -1 });
+  // Construir pipeline de agregação
+  let pipeline = [
+    {
+      $lookup: {
+        from: 'produtos',
+        localField: 'produto_id',
+        foreignField: '_id',
+        as: 'produto_id'
+      }
+    },
+    {
+      $unwind: '$produto_id'
+    }
+  ];
 
-  if (limit) {
-    queryBuilder = queryBuilder.limit(limit);
+  // Adicionar filtro de busca se fornecido
+  if (search) {
+    pipeline.push({
+      $match: {
+        ...matchConditions,
+        'produto_id.descricao': { $regex: search, $options: 'i' }
+      }
+    });
+  } else if (Object.keys(matchConditions).length > 0) {
+    pipeline.push({
+      $match: matchConditions
+    });
   }
 
-  const movements = await queryBuilder;
+  // Ordenação
+  pipeline.push({
+    $sort: { data: -1, createdAt: -1 }
+  });
+
+  // Limitação se especificada
+  if (limit) {
+    pipeline.push({
+      $limit: limit
+    });
+  }
+
+  const movements = await Movement.aggregate(pipeline);
   return movements;
 };
 
