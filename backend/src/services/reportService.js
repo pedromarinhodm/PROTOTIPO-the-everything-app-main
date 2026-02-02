@@ -3,7 +3,8 @@
  * Geração de relatórios em PDF e Excel
  */
 
-import PDFDocument from 'pdfkit';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
 import Product from '../models/Product.js';
 import Movement from '../models/Movement.js';
@@ -13,87 +14,75 @@ import gridfs from '../gridfs/gridfsStorage.js';
  * Gera relatório de estoque em PDF
  */
 const generateStockPDF = async () => {
-  const products = await Product.find({}).sort({ codigo: 1 });
-  
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50 });
-    const chunks = [];
+  const products = await Product.find({}).sort({ codigo: 1 }).limit(1000);
 
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('end', async () => {
-      const buffer = Buffer.concat(chunks);
+  // Criar documento PDF com jsPDF
+  const doc = new jsPDF('p', 'mm', 'a4'); // Portrait para relatório de estoque
 
-      const filename = `relatorio-estoque-${new Date().toISOString().split('T')[0]}.pdf`;
+  // Cabeçalho
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SCGES - Relatório de Estoque', 105, 20, { align: 'center' });
 
-      resolve({ filename, buffer });
-    });
-    doc.on('error', reject);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 105, 30, { align: 'center' });
 
-    // Cabeçalho
-    doc.fontSize(20).font('Helvetica-Bold')
-       .text('SCGES - Relatório de Estoque', { align: 'center' });
-    
-    doc.fontSize(10).font('Helvetica')
-       .text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, { align: 'center' });
-    
-    doc.moveDown(2);
+  // Resumo
+  const totalProducts = products.length;
+  const lowStock = products.filter(p => p.quantidade <= 5).length;
 
-    // Resumo
-    const totalProducts = products.length;
-    const lowStock = products.filter(p => p.quantidade <= 5).length;
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Resumo:', 20, 45);
 
-    doc.fontSize(12).font('Helvetica-Bold').text('Resumo:');
-    doc.fontSize(10).font('Helvetica')
-       .text(`Total de Produtos: ${totalProducts}`)
-       .text(`Produtos com Estoque Baixo: ${lowStock}`);
-    
-    doc.moveDown(2);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Total de Produtos: ${totalProducts}`, 20, 52);
+  doc.text(`Produtos com Estoque Baixo: ${lowStock}`, 20, 59);
 
-    // Tabela de produtos
-    doc.fontSize(12).font('Helvetica-Bold').text('Produtos em Estoque:');
-    doc.moveDown();
+  // Preparar dados da tabela
+  const tableData = products.map(product => {
+    const isLowStock = product.quantidade <= 5;
 
-    // Cabeçalho da tabela
-    const tableTop = doc.y;
-    const columns = [
-      { header: 'Código', width: 60, x: 50 },
-      { header: 'Descrição', width: 250, x: 110 },
-      { header: 'Qtd', width: 50, x: 360 },
-      { header: 'Unidade', width: 60, x: 410 },
+    return [
+      product.codigo.toString(),
+      product.descricao.substring(0, 40),
+      {
+        content: product.quantidade.toString(),
+        styles: {
+          fillColor: isLowStock ? [255, 204, 203] : null, // Light red for low stock
+          textColor: isLowStock ? [139, 0, 0] : [0, 0, 0] // Dark red text for low stock
+        }
+      },
+      product.unidade || '-'
     ];
-
-    doc.fontSize(9).font('Helvetica-Bold');
-    columns.forEach(col => {
-      doc.text(col.header, col.x, tableTop, { width: col.width });
-    });
-
-    doc.moveTo(50, tableTop + 15).lineTo(540, tableTop + 15).stroke();
-    
-    // Dados
-    let y = tableTop + 20;
-    doc.font('Helvetica').fontSize(8);
-
-    products.forEach((product, index) => {
-      // Nova página se necessário
-      if (y > 700) {
-        doc.addPage();
-        y = 50;
-      }
-
-      const isLowStock = product.quantidade <= 5;
-
-      doc.text(product.codigo, 50, y, { width: 60 });
-      doc.text(product.descricao.substring(0, 40), 110, y, { width: 250 });
-      doc.fillColor(isLowStock ? 'red' : 'black')
-         .text(product.quantidade.toString(), 360, y, { width: 50 });
-      doc.fillColor('black')
-         .text(product.unidade, 410, y, { width: 60 });
-
-      y += 15;
-    });
-
-    doc.end();
   });
+
+  // Configurar autoTable
+  autoTable(doc, {
+    head: [['Código', 'Descrição', 'Qtd', 'Unidade']],
+    body: tableData,
+    startY: 70,
+    styles: {
+      fontSize: 8,
+      cellPadding: 3
+    },
+    headStyles: {
+      fillColor: [26, 65, 115],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold'
+    },
+    alternateRowStyles: {
+      fillColor: [249, 250, 251]
+    }
+  });
+
+  // Gerar buffer
+  const buffer = Buffer.from(doc.output('arraybuffer'));
+  const filename = `relatorio-estoque-${new Date().toISOString().split('T')[0]}.pdf`;
+
+  return { filename, buffer };
 };
 
 /**
@@ -128,7 +117,8 @@ const generateHistoryPDF = async (filters = {}) => {
     // Query simples para melhor performance quando não há filtros
     movements = await Movement.find()
       .populate("produto_id", "codigo descricao")
-      .sort({ data: -1, createdAt: -1 });
+      .sort({ data: -1, createdAt: -1 })
+      .limit(1000);
   } else {
     // Pipeline de agregação para filtros complexos
     let pipeline = [
@@ -166,129 +156,121 @@ const generateHistoryPDF = async (filters = {}) => {
 
     movements = await Movement.aggregate(pipeline);
   }
-  
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50 });
-    const chunks = [];
 
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('end', async () => {
-      const buffer = Buffer.concat(chunks);
+  // Criar documento PDF com jsPDF
+  const doc = new jsPDF('l', 'mm', 'a4'); // Landscape para melhor visualização da tabela
 
-      const filename = `relatorio-historico-${new Date().toISOString().split('T')[0]}.pdf`;
+  // Cabeçalho
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SCGES - Histórico de Movimentações', 148, 20, { align: 'center' });
 
-      resolve({ filename, buffer });
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 148, 30, { align: 'center' });
+
+  // Resumo
+  const entries = movements.filter(m => m.tipo === 'entrada');
+  const exits = movements.filter(m => m.tipo === 'saida');
+  const totalEntriesQty = entries.reduce((sum, m) => sum + m.quantidade, 0);
+  const totalExitsQty = exits.reduce((sum, m) => sum + m.quantidade, 0);
+
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Resumo:', 20, 45);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Total de Movimentações: ${movements.length}`, 20, 52);
+  doc.text(`Entradas: ${entries.length} (${totalEntriesQty} unidades)`, 20, 59);
+  doc.text(`Saídas: ${exits.length} (${totalExitsQty} unidades)`, 20, 66);
+  doc.text(`Saldo: ${totalEntriesQty - totalExitsQty} unidades`, 20, 73);
+
+  // Filtros Aplicados
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Filtros Aplicados:', 20, 85);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+
+  const appliedFilters = [];
+  if (filters.search) {
+    appliedFilters.push(`Busca: "${filters.search}"`);
+  }
+  if (type && type !== 'all') {
+    appliedFilters.push(`Tipo: ${type === 'entrada' ? 'Entradas' : 'Saídas'}`);
+  }
+  if (startDate) {
+    appliedFilters.push(`Data Inicial: ${new Date(startDate).toLocaleDateString('pt-BR')}`);
+  }
+  if (endDate) {
+    appliedFilters.push(`Data Final: ${new Date(endDate).toLocaleDateString('pt-BR')}`);
+  }
+
+  let yPosition = 92;
+  if (appliedFilters.length > 0) {
+    appliedFilters.forEach(filter => {
+      doc.text(`• ${filter}`, 20, yPosition);
+      yPosition += 7;
     });
-    doc.on('error', reject);
+  } else {
+    doc.text('• Nenhum', 20, yPosition);
+    yPosition += 7;
+  }
 
-    // Cabeçalho
-    doc.fontSize(20).font('Helvetica-Bold')
-       .text('SCGES - Histórico de Movimentações', { align: 'center' });
-    
-    doc.fontSize(10).font('Helvetica')
-       .text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, { align: 'center' });
-    
-    doc.moveDown(2);
+  // Preparar dados da tabela
+  const tableData = movements.map(movement => {
+    const date = new Date(movement.data).toLocaleDateString('pt-BR');
+    const produtoDescricao = movement.produto_id && movement.produto_id.descricao ? movement.produto_id.descricao.substring(0, 30) : 'Produto não encontrado';
+    const servidor = movement.servidor_almoxarifado ? movement.servidor_almoxarifado.substring(0, 18) : '-';
 
-    // Resumo
-    const entries = movements.filter(m => m.tipo === 'entrada');
-    const exits = movements.filter(m => m.tipo === 'saida');
-    const totalEntriesQty = entries.reduce((sum, m) => sum + m.quantidade, 0);
-    const totalExitsQty = exits.reduce((sum, m) => sum + m.quantidade, 0);
-
-    doc.fontSize(12).font('Helvetica-Bold').text('Resumo:');
-    doc.fontSize(10).font('Helvetica')
-       .text(`Total de Movimentações: ${movements.length}`)
-       .text(`Entradas: ${entries.length} (${totalEntriesQty} unidades)`)
-       .text(`Saídas: ${exits.length} (${totalExitsQty} unidades)`)
-       .text(`Saldo: ${totalEntriesQty - totalExitsQty} unidades`);
-
-    doc.moveDown(2);
-
-    // Filtros Aplicados
-    doc.fontSize(12).font('Helvetica-Bold').text('Filtros Aplicados:');
-    doc.fontSize(10).font('Helvetica');
-
-    const appliedFilters = [];
-    if (filters.search) {
-      appliedFilters.push(`Busca: "${filters.search}"`);
-    }
-    if (type && type !== 'all') {
-      appliedFilters.push(`Tipo: ${type === 'entrada' ? 'Entradas' : 'Saídas'}`);
-    }
-    if (startDate) {
-      appliedFilters.push(`Data Inicial: ${new Date(startDate).toLocaleDateString('pt-BR')}`);
-    }
-    if (endDate) {
-      appliedFilters.push(`Data Final: ${new Date(endDate).toLocaleDateString('pt-BR')}`);
-    }
-
-    if (appliedFilters.length > 0) {
-      appliedFilters.forEach(filter => {
-        doc.text(`• ${filter}`);
-      });
-    } else {
-      doc.text('• Nenhum');
-    }
-
-    doc.moveDown(2);
-
-    // Lista de movimentações
-    doc.fontSize(12).font('Helvetica-Bold').text('Movimentações:');
-    doc.moveDown();
-
-    // Cabeçalho da tabela
-    const tableTop = doc.y;
-    const columns = [
-      { header: 'Data', width: 70, x: 50 },
-      { header: 'Tipo', width: 50, x: 120 },
-      { header: 'Produto', width: 180, x: 170 },
-      { header: 'Qtd', width: 40, x: 350 },
-      { header: 'Servidor', width: 100, x: 390 },
+    return [
+      date,
+      {
+        content: movement.tipo.toUpperCase(),
+        styles: {
+          textColor: movement.tipo === 'entrada' ? [0, 128, 0] : [255, 0, 0]
+        }
+      },
+      produtoDescricao,
+      `${movement.tipo === 'entrada' ? '+' : '-'}${movement.quantidade || 0}`,
+      servidor
     ];
-
-    doc.fontSize(9).font('Helvetica-Bold');
-    columns.forEach(col => {
-      doc.text(col.header, col.x, tableTop, { width: col.width });
-    });
-
-    doc.moveTo(50, tableTop + 15).lineTo(540, tableTop + 15).stroke();
-    
-    // Dados
-    let y = tableTop + 20;
-    doc.font('Helvetica').fontSize(8);
-
-    movements.forEach((movement) => {
-      if (y > 700) {
-        doc.addPage();
-        y = 50;
-      }
-
-      const date = new Date(movement.data).toLocaleDateString('pt-BR');
-      const produtoDescricao = movement.produto_id && movement.produto_id.descricao ? movement.produto_id.descricao.substring(0, 30) : 'Produto não encontrado';
-      const servidor = movement.servidor_almoxarifado ? movement.servidor_almoxarifado.substring(0, 18) : '-';
-
-      doc.text(date, 50, y, { width: 70 });
-      doc.fillColor(movement.tipo === 'entrada' ? 'green' : 'blue')
-         .text(movement.tipo.toUpperCase(), 120, y, { width: 50 });
-      doc.fillColor('black')
-         .text(produtoDescricao, 170, y, { width: 180 });
-      doc.text(`${movement.tipo === 'entrada' ? '+' : '-'}${movement.quantidade || 0}`, 350, y, { width: 40 });
-      doc.text(servidor, 390, y, { width: 100 });
-
-      y += 15;
-    });
-
-    doc.end();
   });
+
+  // Configurar autoTable
+  autoTable(doc, {
+    head: [['Data', 'Tipo', 'Produto', 'Qtd', 'Servidor']],
+    body: tableData,
+    startY: yPosition + 10,
+    styles: {
+      fontSize: 8,
+      cellPadding: 3
+    },
+    headStyles: {
+      fillColor: [26, 65, 115],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold'
+    },
+    alternateRowStyles: {
+      fillColor: [249, 250, 251]
+    }
+  });
+
+  // Gerar buffer
+  const buffer = Buffer.from(doc.output('arraybuffer'));
+  const filename = `relatorio-historico-${new Date().toISOString().split('T')[0]}.pdf`;
+
+  return { filename, buffer };
 };
 
 /**
  * Gera relatório em Excel
  */
 const generateExcelReport = async () => {
-  const products = await Product.find({}).sort({ codigo: 1 });
-  const movements = await Movement.find({}).populate('produto_id', 'codigo descricao').sort({ data: -1 });
+  const products = await Product.find({}).sort({ codigo: 1 }).limit(1000);
+  const movements = await Movement.find({}).populate('produto_id', 'codigo descricao').sort({ data: -1 }).limit(1000);
   
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'SCGES';
