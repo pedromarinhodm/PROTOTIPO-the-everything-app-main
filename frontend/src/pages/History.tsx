@@ -28,11 +28,12 @@ import {
   Filter,
   ArrowDownToLine,
   ArrowUpFromLine,
-  FileDown,
+  Download,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Movement, MovementFilter } from "@/types/stock";
+import { toast } from "sonner";
 
 export default function History() {
   const [movements, setMovements] = useState<Movement[]>([]);
@@ -93,15 +94,17 @@ export default function History() {
     });
   };
 
-  const exportToPDF = async () => {
+  const generateReport = async () => {
     try {
       await api.reports.downloadHistoryPDF({
         type: filter.tipo !== "all" ? filter.tipo : undefined,
         startDate: filter.startDate || undefined,
         endDate: filter.endDate || undefined,
       });
+      toast.success("Relatório gerado com sucesso!");
     } catch (error) {
       console.error("Erro ao gerar relatório PDF:", error);
+      toast.error("Erro ao gerar relatório");
     }
   };
 
@@ -111,9 +114,9 @@ export default function History() {
         title="Histórico de Movimentações"
         description="Visualize todas as entradas e saídas registradas"
         action={
-          <Button variant="outline" onClick={exportToPDF} disabled={filteredMovements.length === 0}>
-            <FileDown className="mr-2 h-4 w-4" />
-            Exportar
+          <Button onClick={generateReport} disabled={filteredMovements.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Gerar Relatório
           </Button>
         }
       />

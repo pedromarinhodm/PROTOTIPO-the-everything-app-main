@@ -15,7 +15,7 @@ set BACKEND_PATH=backend
 set FRONTEND_PATH=frontend
 set FRONTEND_HOST=127.0.0.1
 set FRONTEND_PORT=8080
-set BACKEND_PORT=3001
+set BACKEND_PORT=3000
 
 :: Verifica se MongoDB existe
 if not exist "%MONGO_PATH%" (

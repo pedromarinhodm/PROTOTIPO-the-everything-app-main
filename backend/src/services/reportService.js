@@ -22,16 +22,10 @@ const generateStockPDF = async () => {
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', async () => {
       const buffer = Buffer.concat(chunks);
-      
-      // Salva no GridFS
+
       const filename = `relatorio-estoque-${new Date().toISOString().split('T')[0]}.pdf`;
-      const fileId = await gridfs.saveToGridFS(buffer, filename, {
-        type: 'stock-report',
-        format: 'pdf',
-        generatedAt: new Date(),
-      });
-      
-      resolve({ fileId, filename, buffer });
+
+      resolve({ filename, buffer });
     });
     doc.on('error', reject);
 
@@ -46,14 +40,12 @@ const generateStockPDF = async () => {
 
     // Resumo
     const totalProducts = products.length;
-    const lowStock = products.filter(p => p.quantity <= 5).length;
-    const totalItems = products.reduce((sum, p) => sum + p.quantity, 0);
+    const lowStock = products.filter(p => p.quantidade <= 5).length;
 
     doc.fontSize(12).font('Helvetica-Bold').text('Resumo:');
     doc.fontSize(10).font('Helvetica')
        .text(`Total de Produtos: ${totalProducts}`)
-       .text(`Produtos com Estoque Baixo: ${lowStock}`)
-       .text(`Total de Itens em Estoque: ${totalItems}`);
+       .text(`Produtos com Estoque Baixo: ${lowStock}`);
     
     doc.moveDown(2);
 
@@ -65,10 +57,9 @@ const generateStockPDF = async () => {
     const tableTop = doc.y;
     const columns = [
       { header: 'Código', width: 60, x: 50 },
-      { header: 'Descrição', width: 200, x: 110 },
-      { header: 'Qtd', width: 50, x: 310 },
-      { header: 'Unidade', width: 60, x: 360 },
-      { header: 'Fornecedor', width: 120, x: 420 },
+      { header: 'Descrição', width: 250, x: 110 },
+      { header: 'Qtd', width: 50, x: 360 },
+      { header: 'Unidade', width: 60, x: 410 },
     ];
 
     doc.fontSize(9).font('Helvetica-Bold');
@@ -92,12 +83,11 @@ const generateStockPDF = async () => {
       const isLowStock = product.quantidade <= 5;
 
       doc.text(product.codigo, 50, y, { width: 60 });
-      doc.text(product.descricao.substring(0, 35), 110, y, { width: 200 });
+      doc.text(product.descricao.substring(0, 40), 110, y, { width: 250 });
       doc.fillColor(isLowStock ? 'red' : 'black')
-         .text(product.quantidade.toString(), 310, y, { width: 50 });
+         .text(product.quantidade.toString(), 360, y, { width: 50 });
       doc.fillColor('black')
-         .text(product.unidade, 360, y, { width: 60 });
-      doc.text(product.fornecedor || '-', 420, y, { width: 120 });
+         .text(product.unidade, 410, y, { width: 60 });
 
       y += 15;
     });
@@ -111,17 +101,17 @@ const generateStockPDF = async () => {
  */
 const generateHistoryPDF = async (filters = {}) => {
   let query = {};
-  
+
   if (filters.type && filters.type !== 'all') {
-    query.type = filters.type;
+    query.tipo = filters.type;
   }
   if (filters.startDate) {
-    query.date = { $gte: new Date(filters.startDate) };
+    query.data = { $gte: new Date(filters.startDate) };
   }
   if (filters.endDate) {
     const end = new Date(filters.endDate);
     end.setHours(23, 59, 59, 999);
-    query.date = { ...query.date, $lte: end };
+    query.data = { ...query.data, $lte: end };
   }
 
   const movements = await Movement.find(query).populate('produto_id', 'codigo descricao').sort({ data: -1 });
@@ -133,16 +123,10 @@ const generateHistoryPDF = async (filters = {}) => {
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', async () => {
       const buffer = Buffer.concat(chunks);
-      
+
       const filename = `relatorio-historico-${new Date().toISOString().split('T')[0]}.pdf`;
-      const fileId = await saveToGridFS(buffer, filename, {
-        type: 'history-report',
-        format: 'pdf',
-        generatedAt: new Date(),
-        filters,
-      });
-      
-      resolve({ fileId, filename, buffer });
+
+      resolve({ filename, buffer });
     });
     doc.on('error', reject);
 
@@ -156,10 +140,10 @@ const generateHistoryPDF = async (filters = {}) => {
     doc.moveDown(2);
 
     // Resumo
-    const entries = movements.filter(m => m.type === 'entrada');
-    const exits = movements.filter(m => m.type === 'saida');
-    const totalEntriesQty = entries.reduce((sum, m) => sum + m.quantity, 0);
-    const totalExitsQty = exits.reduce((sum, m) => sum + m.quantity, 0);
+    const entries = movements.filter(m => m.tipo === 'entrada');
+    const exits = movements.filter(m => m.tipo === 'saida');
+    const totalEntriesQty = entries.reduce((sum, m) => sum + m.quantidade, 0);
+    const totalExitsQty = exits.reduce((sum, m) => sum + m.quantidade, 0);
 
     doc.fontSize(12).font('Helvetica-Bold').text('Resumo:');
     doc.fontSize(10).font('Helvetica')
@@ -202,14 +186,16 @@ const generateHistoryPDF = async (filters = {}) => {
       }
 
       const date = new Date(movement.data).toLocaleDateString('pt-BR');
+      const produtoDescricao = movement.produto_id && movement.produto_id.descricao ? movement.produto_id.descricao.substring(0, 30) : 'Produto não encontrado';
+      const servidor = movement.servidor_almoxarifado ? movement.servidor_almoxarifado.substring(0, 18) : '-';
 
       doc.text(date, 50, y, { width: 70 });
       doc.fillColor(movement.tipo === 'entrada' ? 'green' : 'blue')
          .text(movement.tipo.toUpperCase(), 120, y, { width: 50 });
       doc.fillColor('black')
-         .text(movement.produto_id.descricao.substring(0, 30), 170, y, { width: 180 });
-      doc.text(`${movement.tipo === 'entrada' ? '+' : '-'}${movement.quantidade}`, 350, y, { width: 40 });
-      doc.text(movement.servidor_almoxarifado.substring(0, 18), 390, y, { width: 100 });
+         .text(produtoDescricao, 170, y, { width: 180 });
+      doc.text(`${movement.tipo === 'entrada' ? '+' : '-'}${movement.quantidade || 0}`, 350, y, { width: 40 });
+      doc.text(servidor, 390, y, { width: 100 });
 
       y += 15;
     });
@@ -222,7 +208,7 @@ const generateHistoryPDF = async (filters = {}) => {
  * Gera relatório em Excel
  */
 const generateExcelReport = async () => {
-  const products = await Product.find({}).sort({ code: 1 });
+  const products = await Product.find({}).sort({ codigo: 1 });
   const movements = await Movement.find({}).populate('produto_id', 'codigo descricao').sort({ data: -1 });
   
   const workbook = new ExcelJS.Workbook();
@@ -305,16 +291,10 @@ const generateExcelReport = async () => {
 
   // Gera buffer
   const buffer = await workbook.xlsx.writeBuffer();
-  
-  // Salva no GridFS
-  const filename = `relatorio-completo-${new Date().toISOString().split('T')[0]}.xlsx`;
-  const fileId = await gridfs.saveToGridFS(Buffer.from(buffer), filename, {
-    type: 'full-report',
-    format: 'xlsx',
-    generatedAt: new Date(),
-  });
 
-  return { fileId, filename, buffer: Buffer.from(buffer) };
+  const filename = `relatorio-completo-${new Date().toISOString().split('T')[0]}.xlsx`;
+
+  return { filename, buffer: Buffer.from(buffer) };
 };
 
 export default {

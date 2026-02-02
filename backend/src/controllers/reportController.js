@@ -11,12 +11,11 @@ import reportService from '../services/reportService.js';
  */
 const getStockPDF = async (req, res) => {
   try {
-    const { fileId, filename, buffer } = await reportService.generateStockPDF();
-    
+    const { filename, buffer } = await reportService.generateStockPDF();
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('X-File-Id', fileId.toString());
-    
+
     res.send(buffer);
   } catch (error) {
     console.error('Erro ao gerar relatório de estoque:', error);
@@ -35,17 +34,16 @@ const getStockPDF = async (req, res) => {
 const getHistoryPDF = async (req, res) => {
   try {
     const { type, startDate, endDate } = req.query;
-    
-    const { fileId, filename, buffer } = await reportService.generateHistoryPDF({
+
+    const { filename, buffer } = await reportService.generateHistoryPDF({
       type,
       startDate,
       endDate,
     });
-    
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('X-File-Id', fileId.toString());
-    
+
     res.send(buffer);
   } catch (error) {
     console.error('Erro ao gerar relatório de histórico:', error);
@@ -63,12 +61,11 @@ const getHistoryPDF = async (req, res) => {
  */
 const getExcelReport = async (req, res) => {
   try {
-    const { fileId, filename, buffer } = await reportService.generateExcelReport();
-    
+    const { filename, buffer } = await reportService.generateExcelReport();
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('X-File-Id', fileId.toString());
-    
+
     res.send(buffer);
   } catch (error) {
     console.error('Erro ao gerar relatório Excel:', error);
