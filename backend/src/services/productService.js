@@ -3,7 +3,8 @@
  * Lógica de negócio para produtos
  */
 
-const Product = require('../models/Product');
+import Product from '../models/Product.js';
+import Movement from '../models/Movement.js';
 
 /**
  * Gera o próximo código de produto
@@ -110,11 +111,36 @@ const updateProductQuantity = async (id, quantityChange) => {
  */
 const getStockStats = async () => {
   const totalProducts = await Product.countDocuments();
-  const lowStockProducts = await Product.countDocuments({ quantidade: { $lte: 5 } });
-  
-  const products = await Product.find({});
-  const totalStock = products.reduce((sum, p) => sum + p.quantidade, 0);
-  
+
+  // Obter a soma total de entradas por produto
+  const entrySums = await Movement.aggregate([
+    { $match: { tipo: 'entrada' } },
+    {
+      $group: {
+        _id: '$produto_id',
+        totalEntries: { $sum: '$quantidade' }
+      }
+    }
+  ]);
+
+  // Criar mapa de produto_id para soma total de entradas
+  const entrySumMap = new Map();
+  entrySums.forEach(sum => {
+    entrySumMap.set(sum._id.toString(), sum.totalEntries);
+  });
+
+  // Obter todos os produtos
+  const allProducts = await Product.find({});
+
+  // Contar produtos com estoque baixo baseado em 30% da soma total de entradas
+  const lowStockProducts = allProducts.filter(product => {
+    const totalEntries = entrySumMap.get(product._id.toString()) || 0;
+    const threshold = totalEntries * 0.3; // 30% da soma total de entradas
+    return product.quantidade <= threshold;
+  }).length;
+
+  const totalStock = allProducts.reduce((sum, p) => sum + p.quantidade, 0);
+
   return {
     totalProducts,
     lowStockProducts,
@@ -126,13 +152,40 @@ const getStockStats = async () => {
  * Obtém produtos com estoque baixo
  */
 const getLowStockProducts = async (limit = 10) => {
-  const products = await Product.find({ quantidade: { $lte: 5 } })
-    .sort({ quantidade: 1 })
-    .limit(limit);
-  return products;
+  // Primeiro, obter a soma total de entradas por produto
+  const entrySums = await Movement.aggregate([
+    { $match: { tipo: 'entrada' } },
+    {
+      $group: {
+        _id: '$produto_id',
+        totalEntries: { $sum: '$quantidade' }
+      }
+    }
+  ]);
+
+  // Criar mapa de produto_id para soma total de entradas
+  const entrySumMap = new Map();
+  entrySums.forEach(sum => {
+    entrySumMap.set(sum._id.toString(), sum.totalEntries);
+  });
+
+  // Obter todos os produtos
+  const allProducts = await Product.find({});
+
+  // Filtrar produtos com estoque baixo baseado em 30% da soma total de entradas
+  const lowStockProducts = allProducts.filter(product => {
+    const totalEntries = entrySumMap.get(product._id.toString()) || 0;
+    const threshold = totalEntries * 0.3; // 30% da soma total de entradas
+    return product.quantidade <= threshold;
+  });
+
+  // Ordenar por quantidade crescente e limitar
+  return lowStockProducts
+    .sort((a, b) => a.quantidade - b.quantidade)
+    .slice(0, limit);
 };
 
-module.exports = {
+export default {
   getNextProductCode,
   createProduct,
   getAllProducts,

@@ -3,8 +3,8 @@
  * Endpoints para estatísticas do dashboard
  */
 
-const productService = require('../services/productService');
-const movementService = require('../services/movementService');
+import productService from '../services/productService.js';
+import movementService from '../services/movementService.js';
 
 /**
  * GET /api/dashboard/stats
@@ -81,7 +81,7 @@ const getLowStockProducts = async (req, res) => {
   }
 };
 
-module.exports = {
+export default {
   getStats,
   getRecentMovements,
   getLowStockProducts,

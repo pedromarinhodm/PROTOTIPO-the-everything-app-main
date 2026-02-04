@@ -28,13 +28,13 @@ export default function Dashboard() {
         setLoading(true);
         const [statsData, movementsData, productsData] = await Promise.all([
           api.dashboard.getStats(),
-          api.movements.getAll({ limit: 5 }),
-          api.products.getAll(),
+          api.dashboard.getRecentMovements(5),
+          api.dashboard.getLowStockProducts(5),
         ]);
 
         setStats(statsData);
         setRecentMovements(movementsData);
-        setLowStockProducts(productsData.filter((p) => p.quantidade <= 5).slice(0, 5));
+        setLowStockProducts(productsData);
       } catch (error) {
         console.error("Erro ao carregar dados do dashboard:", error);
       } finally {
@@ -80,7 +80,7 @@ export default function Dashboard() {
           value={loading ? 0 : stats.lowStockProducts}
           icon={AlertTriangle}
           variant="warning"
-          description="Produtos com ≤5 unidades"
+          description="Produtos com ≤30%"
         />
       </div>
 

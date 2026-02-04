@@ -30,7 +30,11 @@ const generateStockPDF = async () => {
 
   // Resumo
   const totalProducts = products.length;
-  const lowStock = products.filter(p => p.quantidade <= 5).length;
+  const lowStock = products.filter(p => {
+    const totalEntries = entrySumMap.get(p._id.toString()) || 0;
+    const threshold = totalEntries * 0.3; // 30% da soma total de entradas
+    return p.quantidade <= threshold;
+  }).length;
 
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
@@ -43,7 +47,9 @@ const generateStockPDF = async () => {
 
   // Preparar dados da tabela
   const tableData = products.map(product => {
-    const isLowStock = product.quantidade <= 5;
+    const totalEntries = entrySumMap.get(product._id.toString()) || 0;
+    const threshold = totalEntries * 0.3; // 30% da soma total de entradas
+    const isLowStock = product.quantidade <= threshold;
 
     return [
       product.codigo.toString(),
@@ -271,6 +277,23 @@ const generateHistoryPDF = async (filters = {}) => {
 const generateExcelReport = async () => {
   const products = await Product.find({}).sort({ codigo: 1 }).limit(1000);
   const movements = await Movement.find({}).populate('produto_id', 'codigo descricao').sort({ data: -1 }).limit(1000);
+
+  // Obter a soma total de entradas por produto
+  const entrySums = await Movement.aggregate([
+    { $match: { tipo: 'entrada' } },
+    {
+      $group: {
+        _id: '$produto_id',
+        totalEntries: { $sum: '$quantidade' }
+      }
+    }
+  ]);
+
+  // Criar mapa de produto_id para soma total de entradas
+  const entrySumMap = new Map();
+  entrySums.forEach(sum => {
+    entrySumMap.set(sum._id.toString(), sum.totalEntries);
+  });
   
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'SCGES';
@@ -309,7 +332,9 @@ const generateExcelReport = async () => {
     });
 
     // Destaca estoque baixo
-    if (product.quantidade <= 5) {
+    const totalEntries = entrySumMap.get(product._id.toString()) || 0;
+    const threshold = totalEntries * 0.3; // 30% da soma total de entradas
+    if (product.quantidade <= threshold) {
       row.getCell('quantidade').fill = {
         type: 'pattern',
         pattern: 'solid',

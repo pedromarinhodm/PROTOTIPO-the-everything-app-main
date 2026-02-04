@@ -17,7 +17,7 @@ O SCGES é um sistema fullstack composto por:
 - Cadastro, edição e exclusão de produtos
 - Busca por descrição, código ou fornecedor
 - Geração automática de códigos sequenciais
-- Alerta de estoque baixo (≤5 unidades)
+- Alerta de estoque baixo (≤30%)
 
 ### Controle de Movimentações
 - Registro de entradas de materiais

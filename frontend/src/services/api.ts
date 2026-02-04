@@ -260,43 +260,27 @@ export const movementsAPI = {
 
 export const dashboardAPI = {
   /**
-   * Obtém estatísticas do dashboard (calculadas no frontend)
+   * Obtém estatísticas do dashboard
    */
   async getStats(): Promise<DashboardStats> {
-    const [products, movements] = await Promise.all([
-      productsAPI.getAll(),
-      movementsAPI.getAll()
-    ]);
-
-    const totalProducts = products.length;
-    const totalEntries = movements.filter(m => m.tipo === 'entrada').length;
-    const totalExits = movements.filter(m => m.tipo === 'saida').length;
-    const lowStockProducts = products.filter(p => p.quantidade <= 5).length;
-    const totalMovements = movements.length;
-
-    return {
-      totalProducts,
-      totalEntries,
-      totalExits,
-      lowStockProducts,
-      totalMovements
-    };
+    const response = await fetchAPI<APIResponse<DashboardStats>>('/api/dashboard/stats');
+    return response.data;
   },
 
   /**
    * Obtém movimentações recentes
    */
   async getRecentMovements(limit: number = 5): Promise<Movement[]> {
-    const movements = await movementsAPI.getAll();
-    return movements.slice(0, limit);
+    const response = await fetchAPI<APIResponse<Movement[]>>('/api/dashboard/recent-movements');
+    return response.data;
   },
 
   /**
    * Obtém produtos com estoque baixo
    */
   async getLowStockProducts(limit: number = 5): Promise<Product[]> {
-    const products = await productsAPI.getAll();
-    return products.filter(p => p.quantidade <= 10).slice(0, limit);
+    const response = await fetchAPI<APIResponse<Product[]>>('/api/dashboard/low-stock');
+    return response.data;
   },
 };
 

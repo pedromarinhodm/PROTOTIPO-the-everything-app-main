@@ -13,6 +13,7 @@ import Movimentacao from './models/Movement.js';
 
 // Import routes
 import reportRoutes from './routes/reportRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
 
 
 const __filename = fileURLToPath(import.meta.url)
@@ -412,11 +413,11 @@ app.get("/api/formularios", async (req, res) => {
 // Visualizar formulários
 app.get("/api/formularios/:id/view", async (req, res) => {
   try {
-    const metaId = new mongoose.Types.ObjectId(req.params.id);
+    const metaId = new ObjectId(req.params.id);
     const meta = await mongoose.connection.db.collection("formularios_meta").findOne({ _id: metaId });
     if (!meta) return res.status(404).json({ error: "Arquivo não encontrado" });
 
-    const fileId = meta.fileId instanceof mongoose.Types.ObjectId ? meta.fileId : new mongoose.Types.ObjectId(meta.fileId);
+    const fileId = meta.fileId instanceof ObjectId ? meta.fileId : new ObjectId(meta.fileId);
 
     res.set({
       "Content-Type": "application/pdf",
@@ -433,11 +434,11 @@ app.get("/api/formularios/:id/view", async (req, res) => {
 // Download formulário
 app.get("/api/formularios/:id/download", async (req, res) => {
   try {
-    const metaId = new mongoose.Types.ObjectId(req.params.id);
+    const metaId = new ObjectId(req.params.id);
     const meta = await mongoose.connection.db.collection("formularios_meta").findOne({ _id: metaId });
     if (!meta) return res.status(404).json({ error: "Arquivo não encontrado" });
 
-    const fileId = meta.fileId instanceof mongoose.Types.ObjectId ? meta.fileId : new mongoose.Types.ObjectId(meta.fileId);
+    const fileId = meta.fileId instanceof ObjectId ? meta.fileId : new ObjectId(meta.fileId);
 
     res.set({
       "Content-Type": "application/pdf",
@@ -487,6 +488,11 @@ app.delete("/api/formularios/:id", async (req, res) => {
 // 📊 Rotas de Relatórios
 // =====================================
 app.use('/api/reports', reportRoutes);
+
+// =====================================
+// 📊 Rotas do Dashboard
+// =====================================
+app.use('/api/dashboard', dashboardRoutes);
 
 // =====================================
 // 🚀 Servidor

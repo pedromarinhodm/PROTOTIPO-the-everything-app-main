@@ -3,9 +3,9 @@
  * Rotas da API do dashboard
  */
 
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const dashboardController = require('../controllers/dashboardController');
+import dashboardController from '../controllers/dashboardController.js';
 
 // GET /api/dashboard/stats - Estatísticas consolidadas
 router.get('/stats', dashboardController.getStats);
@@ -16,4 +16,4 @@ router.get('/recent-movements', dashboardController.getRecentMovements);
 // GET /api/dashboard/low-stock - Produtos com estoque baixo
 router.get('/low-stock', dashboardController.getLowStockProducts);
 
-module.exports = router;
+export default router;

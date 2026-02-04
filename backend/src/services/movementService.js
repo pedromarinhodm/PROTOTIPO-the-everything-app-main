@@ -3,9 +3,9 @@
  * Lógica de negócio para movimentações
  */
 
-const Movement = require('../models/Movement');
-const Product = require('../models/Product');
-const productService = require('./productService');
+import Movement from '../models/Movement.js';
+import Product from '../models/Product.js';
+import productService from './productService.js';
 
 /**
  * Registra uma entrada de estoque
@@ -178,7 +178,7 @@ const deleteMovementsByProduct = async (produto) => {
   await Movement.deleteMany({ produto: { $regex: new RegExp(`^${produto}$`, 'i') } });
 };
 
-module.exports = {
+export default {
   createEntry,
   createExit,
   getMovements,
