@@ -161,6 +161,11 @@
     border-left-color: hsl(var(--info));
   }
 
+  .stats-card-destructive {
+    @apply relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm transition-all duration-200 hover:shadow-md border-l-4;
+    border-left-color: hsl(var(--destructive));
+  }
+
   /* Gov Header */
   .gov-header {
     @apply bg-primary text-primary-foreground py-4 px-6;

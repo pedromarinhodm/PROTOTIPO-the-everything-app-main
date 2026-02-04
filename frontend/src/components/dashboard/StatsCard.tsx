@@ -6,7 +6,7 @@ interface StatsCardProps {
   value: string | number;
   description?: string;
   icon: LucideIcon;
-  variant?: "primary" | "accent" | "warning" | "info";
+  variant?: "primary" | "accent" | "warning" | "info" | "destructive";
   trend?: {
     value: number;
     label: string;
@@ -18,6 +18,7 @@ const variantClasses = {
   accent: "stats-card-accent",
   warning: "stats-card-warning",
   info: "stats-card-info",
+  destructive: "stats-card-destructive",
 };
 
 const iconVariantClasses = {
@@ -25,6 +26,7 @@ const iconVariantClasses = {
   accent: "bg-accent/10 text-accent",
   warning: "bg-warning/10 text-warning",
   info: "bg-info/10 text-info",
+  destructive: "bg-destructive/10 text-destructive",
 };
 
 export function StatsCard({

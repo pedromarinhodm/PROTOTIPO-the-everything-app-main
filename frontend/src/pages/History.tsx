@@ -140,12 +140,12 @@ export default function History() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
-                <ArrowUpFromLine className="h-5 w-5 text-info" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
+                <ArrowUpFromLine className="h-5 w-5 text-destructive" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Saídas</p>
-                <p className="text-2xl font-bold text-info">{stats.totalExits}</p>
+                <p className="text-2xl font-bold text-destructive">{stats.totalExits}</p>
               </div>
             </div>
           </CardContent>
@@ -276,11 +276,11 @@ export default function History() {
                       </TableCell>
                       <TableCell className="text-center align-middle">
                         <Badge
-                          variant={movement.tipo === "entrada" ? "default" : "secondary"}
+                          variant={movement.tipo === "entrada" ? "default" : "destructive"}
                           className={
                             movement.tipo === "entrada"
                               ? "bg-accent text-accent-foreground"
-                              : "bg-info text-info-foreground"
+                              : ""
                           }
                         >
                           {movement.tipo === "entrada" ? (

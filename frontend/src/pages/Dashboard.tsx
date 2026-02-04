@@ -72,7 +72,7 @@ export default function Dashboard() {
           title="Total de Saídas"
           value={loading ? 0 : stats.totalExits}
           icon={ArrowUpFromLine}
-          variant="info"
+          variant="destructive"
           description="Unidades distribuídas"
         />
         <StatsCard
@@ -108,7 +108,7 @@ export default function Dashboard() {
                   >
                     <div className="flex items-center gap-3">
                       <Badge
-                        variant={movement.tipo === "entrada" ? "default" : "destructive"}
+                        variant={movement.tipo === "entrada" ? "accent" : "destructive"}
                         className="capitalize"
                       >
                         {movement.tipo}

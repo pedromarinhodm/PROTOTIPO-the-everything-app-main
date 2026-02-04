@@ -329,9 +329,9 @@ export default function Products() {
                       <TableCell className="text-center align-middle">
                         <span
                           className={
-                            product.quantidade <= 10
+                            product.quantidade <= 30
                               ? "text-destructive font-semibold"
-                              : ""
+                              : "text-accent font-semibold"
                           }
                         >
                           {product.quantidade}
