@@ -4,7 +4,7 @@ color 0A
 
 echo ============================================================
 echo    SCGES - Sistema de Controle e Gerenciamento de Estoque
-echo    SEMSC - Secretaria Municipal de Seguranca Comunitaria
+echo    SEMSC - Secretaria Municipal de Seguranca Cidada
 echo ============================================================
 echo.
 

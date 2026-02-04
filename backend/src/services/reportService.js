@@ -158,16 +158,16 @@ const generateHistoryPDF = async (filters = {}) => {
   }
 
   // Criar documento PDF com jsPDF
-  const doc = new jsPDF('l', 'mm', 'a4'); // Landscape para melhor visualização da tabela
+  const doc = new jsPDF('p', 'mm', 'a4'); // Portrait para relatório de histórico
 
   // Cabeçalho
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text('SCGES - Histórico de Movimentações', 148, 20, { align: 'center' });
+  doc.text('SCGES - Histórico de Movimentações', 105, 20, { align: 'center' });
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 148, 30, { align: 'center' });
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 105, 30, { align: 'center' });
 
   // Resumo
   const entries = movements.filter(m => m.tipo === 'entrada');
