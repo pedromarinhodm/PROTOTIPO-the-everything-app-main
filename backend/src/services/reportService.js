@@ -16,6 +16,23 @@ import gridfs from '../gridfs/gridfsStorage.js';
 const generateStockPDF = async () => {
   const products = await Product.find({}).sort({ codigo: 1 }).limit(1000);
 
+  // Obter a soma total de entradas por produto
+  const entrySums = await Movement.aggregate([
+    { $match: { tipo: 'entrada' } },
+    {
+      $group: {
+        _id: '$produto_id',
+        totalEntries: { $sum: '$quantidade' }
+      }
+    }
+  ]);
+
+  // Criar mapa de produto_id para soma total de entradas
+  const entrySumMap = new Map();
+  entrySums.forEach(sum => {
+    entrySumMap.set(sum._id.toString(), sum.totalEntries);
+  });
+
   // Criar documento PDF com jsPDF
   const doc = new jsPDF('p', 'mm', 'a4'); // Portrait para relatório de estoque
 
