@@ -47,13 +47,37 @@ const getAllProducts = async (searchQuery = '') => {
       $or: [
         { descricao: { $regex: searchQuery, $options: 'i' } },
         { codigo: { $regex: searchQuery, $options: 'i' } },
-        { supplier: { $regex: searchQuery, $options: 'i' } },
+        { fornecedor: { $regex: searchQuery, $options: 'i' } },
       ],
     };
   }
 
+  // Obter a soma total de entradas por produto
+  const entrySums = await Movement.aggregate([
+    { $match: { tipo: 'entrada' } },
+    {
+      $group: {
+        _id: '$produto_id',
+        totalEntries: { $sum: '$quantidade' }
+      }
+    }
+  ]);
+
+  // Criar mapa de produto_id para soma total de entradas
+  const entrySumMap = new Map();
+  entrySums.forEach(sum => {
+    entrySumMap.set(sum._id.toString(), sum.totalEntries);
+  });
+
   const products = await Product.find(query).sort({ descricao: 1 });
-  return products;
+
+  // Adicionar totalEntries a cada produto
+  const productsWithEntries = products.map(product => ({
+    ...product.toObject(),
+    totalEntries: entrySumMap.get(product._id.toString()) || 0,
+  }));
+
+  return productsWithEntries;
 };
 
 /**

@@ -11,6 +11,9 @@ import { ObjectId } from "mongodb";
 import Produto from './models/Product.js';
 import Movimentacao from './models/Movement.js';
 
+// Import services
+import productService from './services/productService.js';
+
 // Import routes
 import reportRoutes from './routes/reportRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
@@ -74,8 +77,13 @@ app.use((req, res, next) => {
 // =====================================
 app.get("/api/produtos", async (req, res) => {
   try {
-    const produtos = await Produto.find().sort({ descricao: 1 })
-    res.json(produtos)
+    const { search } = req.query;
+    const produtos = await productService.getAllProducts(search);
+    res.json({
+      success: true,
+      data: produtos,
+      count: produtos.length,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

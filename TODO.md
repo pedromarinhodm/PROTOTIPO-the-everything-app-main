@@ -1,3 +1,0 @@
-- [x] Modify getLowStockProducts in backend/src/services/productService.js to calculate threshold as 30% of total entry sum per product
-- [x] Modify getStockStats in backend/src/services/productService.js to use new low stock logic
-- [x] Update reportService.js to use new low stock logic in PDF and Excel generation

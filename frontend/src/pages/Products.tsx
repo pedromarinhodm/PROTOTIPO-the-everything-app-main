@@ -172,15 +172,17 @@ export default function Products() {
     try {
       setLoading(true);
       const data = await api.products.getAll();
-      setProducts(data);
+      setProducts(data || []);
     } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
       toast.error("Erro ao carregar produtos");
+      setProducts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredProducts = products.filter(product =>
+  const filteredProducts = (products || []).filter(product =>
     product.descricao.toLowerCase().includes(searchQuery.toLowerCase()) ||
     product.fornecedor?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     product.codigo.toString().includes(searchQuery)
@@ -329,9 +331,9 @@ export default function Products() {
                       <TableCell className="text-center align-middle">
                         <span
                           className={
-                            product.quantidade <= 30
-                              ? "text-destructive font-semibold"
-                              : "text-accent font-semibold"
+                            product.quantidade <= (product.totalEntries || 0) * 0.3
+                              ? "text-red-500 font-semibold"
+                              : "text-green-500 font-semibold"
                           }
                         >
                           {product.quantidade}

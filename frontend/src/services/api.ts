@@ -63,6 +63,7 @@ export interface Product {
   fornecedor?: string;
   numero_processo?: string;
   observacoes?: string;
+  totalEntries?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -115,8 +116,8 @@ export const productsAPI = {
    * Lista todos os produtos
    */
   async getAll(search?: string): Promise<Product[]> {
-    const response = await fetchAPI<Product[]>('/api/produtos');
-    return response;
+    const response = await fetchAPI<APIResponse<Product[]>>('/api/produtos');
+    return response.data;
   },
 
   /**
