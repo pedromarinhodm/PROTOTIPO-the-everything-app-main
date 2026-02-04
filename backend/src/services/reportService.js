@@ -68,18 +68,45 @@ const generateStockPDF = async () => {
     const threshold = totalEntries * 0.3; // 30% da soma total de entradas
     const isLowStock = product.quantidade <= threshold;
 
-    return [
-      product.codigo.toString(),
-      product.descricao.substring(0, 40),
-      {
-        content: product.quantidade.toString(),
-        styles: {
-          fillColor: isLowStock ? [255, 204, 203] : null, // Light red for low stock
-          textColor: isLowStock ? [139, 0, 0] : [0, 0, 0] // Dark red text for low stock
+    if (isLowStock) {
+      return [
+        {
+          content: product.codigo.toString(),
+          styles: {
+            fillColor: [255, 204, 203], // Light red for low stock
+            textColor: [139, 0, 0] // Dark red text for low stock
+          }
+        },
+        {
+          content: product.descricao.substring(0, 40),
+          styles: {
+            fillColor: [255, 204, 203], // Light red for low stock
+            textColor: [139, 0, 0] // Dark red text for low stock
+          }
+        },
+        {
+          content: product.quantidade.toString(),
+          styles: {
+            fillColor: [255, 204, 203], // Light red for low stock
+            textColor: [139, 0, 0] // Dark red text for low stock
+          }
+        },
+        {
+          content: product.unidade || '-',
+          styles: {
+            fillColor: [255, 204, 203], // Light red for low stock
+            textColor: [139, 0, 0] // Dark red text for low stock
+          }
         }
-      },
-      product.unidade || '-'
-    ];
+      ];
+    } else {
+      return [
+        product.codigo.toString(),
+        product.descricao.substring(0, 40),
+        product.quantidade.toString(),
+        product.unidade || '-'
+      ];
+    }
   });
 
   // Configurar autoTable
@@ -348,15 +375,17 @@ const generateExcelReport = async () => {
       createdAt: new Date(product.createdAt).toLocaleDateString('pt-BR'),
     });
 
-    // Destaca estoque baixo
+    // Destaca estoque baixo na linha inteira
     const totalEntries = entrySumMap.get(product._id.toString()) || 0;
     const threshold = totalEntries * 0.3; // 30% da soma total de entradas
     if (product.quantidade <= threshold) {
-      row.getCell('quantidade').fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFCCCB' }
-      };
+      row.eachCell(cell => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFCCCB' }
+        };
+      });
     }
   });
 
