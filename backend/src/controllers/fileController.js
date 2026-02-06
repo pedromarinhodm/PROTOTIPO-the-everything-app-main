@@ -53,9 +53,15 @@ const uploadFile = async (req, res) => {
       uploadDate: new Date(),
     });
 
+    // Return complete file information matching frontend expectations
     res.json({
-      message: 'Formulário salvo com sucesso',
-      id: fileId.toString()
+      _id: fileId.toString(),
+      fileId: fileId.toString(),
+      filename: filename,
+      length: req.file.buffer.length,
+      uploadDate: new Date(),
+      data_inicial: data_inicial || null,
+      data_final: data_final || null,
     });
   } catch (error) {
     console.error('Erro ao fazer upload de formulário:', error);

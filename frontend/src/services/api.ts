@@ -108,7 +108,7 @@ class ApiService {
 
   // Files
   files = {
-    getAll: (): Promise<{ _id: string; filename: string; length: number; uploadDate: string; metadata?: any }[]> =>
+    getAll: (): Promise<{ _id: string; fileId: string; filename: string; data_inicial: string; data_final: string; uploadDate: string; length?: number }[]> =>
       this.request('/formularios'),
 
     upload: (formData: FormData): Promise<{ _id: string; filename: string; length: number; uploadDate: string }> => {
@@ -124,8 +124,13 @@ class ApiService {
     view: (fileId: string): Promise<Blob> =>
       fetch(`${API_BASE_URL}/formularios/${fileId}/view`).then(res => res.blob()),
 
-    download: (fileId: string): Promise<Blob> =>
-      fetch(`${API_BASE_URL}/formularios/${fileId}/download`).then(res => res.blob()),
+    download: async (fileId: string, filename?: string): Promise<void> => {
+      const response = await fetch(`${API_BASE_URL}/formularios/${fileId}/download`);
+      if (!response.ok) throw new Error(`Failed to download file: ${response.statusText}`);
+      const blob = await response.blob();
+      const downloadFilename = filename || response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'formulario.pdf';
+      downloadBlob(blob, downloadFilename);
+    },
 
     delete: (fileId: string): Promise<void> =>
       this.request(`/formularios/${fileId}`, {

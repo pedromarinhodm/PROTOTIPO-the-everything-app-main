@@ -19,7 +19,9 @@ type FileItem = {
   data_inicial: string;
   data_final: string;
   uploadDate: string;
+  length?: number;
 };
+
 
 export default function Formularios() {
   const [lista, setLista] = useState<FileItem[]>([]);
@@ -108,12 +110,13 @@ export default function Formularios() {
 
   async function baixar(id: string, nome?: string) {
     try {
-      await api.files.download(id);
+      await api.files.download(id, nome);
     } catch (err) {
       console.error(err);
       toast.error("Erro ao baixar arquivo");
     }
   }
+
 
   async function excluir(id: string) {
     if (!confirm("Deseja realmente excluir este arquivo?")) return;
@@ -141,8 +144,8 @@ export default function Formularios() {
                   Anexar Formulário
                 </Button>
               </DialogTrigger>
-              <form onSubmit={enviar}>
-                <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl">
+                <form onSubmit={enviar}>
                   <DialogHeader>
                     <DialogTitle>Anexar Formulário (PDF)</DialogTitle>
                   </DialogHeader>
@@ -150,12 +153,12 @@ export default function Formularios() {
                   <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label>Data Inicial</Label>
-                        <Input type="date" value={dataInicial} onChange={(e) => setDataInicial(e.target.value)} required />
+                        <Label htmlFor="dataInicial">Data Inicial</Label>
+                        <Input id="dataInicial" type="date" value={dataInicial} onChange={(e) => setDataInicial(e.target.value)} required />
                       </div>
                       <div>
-                        <Label>Data Final</Label>
-                        <Input type="date" value={dataFinal} onChange={(e) => setDataFinal(e.target.value)} required />
+                        <Label htmlFor="dataFinal">Data Final</Label>
+                        <Input id="dataFinal" type="date" value={dataFinal} onChange={(e) => setDataFinal(e.target.value)} required />
                       </div>
                     </div>
 
@@ -172,12 +175,13 @@ export default function Formularios() {
                   </div>
 
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setOpenModal(false)}>Cancelar</Button>
+                    <Button type="button" variant="outline" onClick={() => setOpenModal(false)}>Cancelar</Button>
                     <Button type="submit">Enviar</Button>
                   </DialogFooter>
-                </DialogContent>
-              </form>
+                </form>
+              </DialogContent>
             </Dialog>
+
           </div>
         }
       />
