@@ -95,7 +95,7 @@ export function AppSidebar() {
               Sistema de Controle e Gerenciamento de Estoque
             </p>
             <p className="mt-1 text-xs font-medium text-sidebar-foreground">
-              Versão 1.0.0
+              Versão 1.2.0
             </p>
           </div>
         </div>
