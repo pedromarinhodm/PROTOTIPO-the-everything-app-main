@@ -96,7 +96,7 @@ export default function History() {
 
   const generateReport = async () => {
     try {
-      await api.reports.downloadHistoryPDF({
+      await api.reports.getHistoryPDF({
         type: filter.tipo !== "all" ? filter.tipo : undefined,
         startDate: filter.startDate || undefined,
         endDate: filter.endDate || undefined,

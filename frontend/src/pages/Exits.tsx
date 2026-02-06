@@ -4,7 +4,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowUpFromLine, CheckCircle2, AlertCircle } from "lucide-react";
@@ -32,8 +31,8 @@ export default function Exits() {
 
   const loadProducts = async () => {
     try {
-      const productsData = await api.products.getAll();
-      setProducts(productsData);
+      const response = await api.products.getAll();
+      setProducts(response.data);
     } catch (error) {
       console.error("Erro ao carregar produtos:", error);
       toast.error("Erro ao carregar produtos");
@@ -79,7 +78,7 @@ export default function Exits() {
     setIsSubmitting(true);
 
     try {
-      await api.movements.createSaida({
+      await api.movements.createExit({
         produto_id: formData.productId,
         quantidade: parseInt(formData.quantidade),
         servidor_almoxarifado: formData.servidor_almoxarifado.trim(),

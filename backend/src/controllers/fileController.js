@@ -3,52 +3,45 @@
  * Endpoints para gerenciamento de arquivos no GridFS
  */
 
-const { listFiles, getFromGridFS, deleteFromGridFS, saveToGridFS } = require('../gridfs/gridfsStorage');
+import { listFiles, getFromGridFS, deleteFromGridFS, saveToGridFS } from '../gridfs/gridfsStorage.js';
 
 /**
- * GET /api/files
- * Lista todos os arquivos armazenados
+ * GET /api/formularios
+ * Lista todos os formulários armazenados
  */
 const getFiles = async (req, res) => {
   try {
     const files = await listFiles();
-    
+
     const formattedFiles = files.map(file => ({
-      id: file._id.toString(),
+      _id: file._id.toString(),
+      fileId: file._id.toString(),
       filename: file.filename,
-      length: file.length,
-      uploadDate: file.uploadDate,
-      metadata: file.metadata,
+      data_inicial: file.metadata.data_inicial,
+      data_final: file.metadata.data_final,
+      uploadDate: file.metadata.uploadDate || file.uploadDate,
     }));
 
-    res.json({
-      success: true,
-      data: formattedFiles,
-      count: formattedFiles.length,
-    });
+    res.json(formattedFiles);
   } catch (error) {
-    console.error('Erro ao listar arquivos:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao listar arquivos',
-      message: error.message,
-    });
+    console.error('Erro ao listar formulários:', error);
+    res.status(500).json({ error: 'Erro ao listar formulários' });
   }
 };
 
 /**
- * POST /api/files
- * Upload de arquivo (PDF) com metadata `data_inicial` e `data_final`
+ * POST /api/formularios
+ * Upload de formulário (PDF) com metadata `data_inicial` e `data_final`
  */
 const uploadFile = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, error: 'Nenhum arquivo enviado' });
+      return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
     }
 
     // Aceita somente PDF
     if (req.file.mimetype !== 'application/pdf') {
-      return res.status(400).json({ success: false, error: 'Apenas arquivos PDF são permitidos' });
+      return res.status(400).json({ error: 'Apenas arquivos PDF são permitidos' });
     }
 
     const { data_inicial, data_final } = req.body;
@@ -60,16 +53,19 @@ const uploadFile = async (req, res) => {
       uploadDate: new Date(),
     });
 
-    res.status(201).json({ success: true, data: { id: fileId.toString(), filename } });
+    res.json({
+      message: 'Formulário salvo com sucesso',
+      id: fileId.toString()
+    });
   } catch (error) {
-    console.error('Erro ao fazer upload de arquivo:', error);
-    res.status(500).json({ success: false, error: 'Erro ao salvar arquivo', message: error.message });
+    console.error('Erro ao fazer upload de formulário:', error);
+    res.status(500).json({ error: 'Erro interno no servidor.' });
   }
 };
 
 /**
- * GET /api/files/:id/view
- * Visualiza PDF inline
+ * GET /api/formularios/:id/view
+ * Visualiza formulário inline (PDF)
  */
 const viewFile = async (req, res) => {
   try {
@@ -78,7 +74,7 @@ const viewFile = async (req, res) => {
     // Apenas PDFs suportados para visualização inline
     const isPDF = (file.contentType && file.contentType === 'application/pdf') || (file.filename && file.filename.toLowerCase().endsWith('.pdf'));
     if (!isPDF) {
-      return res.status(400).json({ success: false, error: 'Visualização apenas suportada para PDFs' });
+      return res.status(400).json({ error: 'Visualização apenas suportada para PDFs' });
     }
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -88,54 +84,44 @@ const viewFile = async (req, res) => {
 
     stream.on('error', (err) => {
       console.error('Erro no stream:', err);
-      if (!res.headersSent) res.status(500).json({ success: false, error: 'Erro ao transmitir arquivo' });
+      if (!res.headersSent) res.status(500).json({ error: 'Erro ao transmitir arquivo' });
     });
   } catch (error) {
-    console.error('Erro ao visualizar arquivo:', error);
+    console.error('Erro ao visualizar formulário:', error);
     if (error.message === 'Arquivo não encontrado') {
-      return res.status(404).json({ success: false, error: 'Arquivo não encontrado' });
+      return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
-    res.status(500).json({ success: false, error: 'Erro ao visualizar arquivo', message: error.message });
+    res.status(500).json({ error: 'Erro ao visualizar formulário' });
   }
 };
 /**
- * GET /api/files/:id
- * Download de um arquivo por ID
+ * GET /api/formularios/:id/download
+ * Download de um formulário por ID
  */
 const downloadFile = async (req, res) => {
   try {
     const { stream, file } = await getFromGridFS(req.params.id);
-    
+
     // Define headers para download
     res.setHeader('Content-Type', getContentType(file.filename));
     res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
     res.setHeader('Content-Length', file.length);
-    
+
     // Stream do arquivo
     stream.pipe(res);
-    
+
     stream.on('error', (error) => {
       console.error('Erro no stream:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Erro ao baixar arquivo',
-      });
+      res.status(500).json({ error: 'Erro ao baixar arquivo' });
     });
   } catch (error) {
-    console.error('Erro ao baixar arquivo:', error);
-    
+    console.error('Erro ao baixar formulário:', error);
+
     if (error.message === 'Arquivo não encontrado') {
-      return res.status(404).json({
-        success: false,
-        error: 'Arquivo não encontrado',
-      });
+      return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
 
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao baixar arquivo',
-      message: error.message,
-    });
+    res.status(500).json({ error: 'Erro ao baixar formulário' });
   }
 };
 
@@ -178,7 +164,7 @@ const getContentType = (filename) => {
   return types[ext] || 'application/octet-stream';
 };
 
-module.exports = {
+export default {
   getFiles,
   uploadFile,
   viewFile,

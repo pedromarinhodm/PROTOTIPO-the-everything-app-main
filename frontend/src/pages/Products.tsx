@@ -171,8 +171,8 @@ export default function Products() {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const data = await api.products.getAll();
-      setProducts(data || []);
+      const response = await api.products.getAll();
+      setProducts(response.data || []);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
       toast.error("Erro ao carregar produtos");
@@ -209,7 +209,7 @@ export default function Products() {
     }
 
     try {
-      const updatedProduct = await api.products.update(editingProduct._id, {
+      const result = await api.products.update(editingProduct._id, {
         descricao: formData.descricao,
         quantidade: parseInt(formData.quantidade) || editingProduct.quantidade,
         unidade: formData.unidade,
@@ -220,7 +220,7 @@ export default function Products() {
         observacoes: formData.observacoes || undefined,
       });
 
-      setProducts(prev => prev.map(p => p._id === editingProduct._id ? updatedProduct : p));
+      setProducts(prev => prev.map(p => p._id === editingProduct._id ? result.produto : p));
       toast.success("Produto atualizado com sucesso!");
       setIsEditDialogOpen(false);
       setEditingProduct(null);
@@ -273,7 +273,7 @@ export default function Products() {
         action={
           <Button onClick={async () => {
             try {
-              await api.reports.downloadStockPDF();
+              await api.reports.getStockPDF();
               toast.success("Relatório gerado com sucesso!");
             } catch (error) {
               toast.error("Erro ao gerar relatório");
@@ -331,7 +331,7 @@ export default function Products() {
                       <TableCell className="text-center align-middle">
                         <span
                           className={
-                            product.quantidade <= (product.totalEntries || 0) * 0.3
+                            product.quantidade <= 5
                               ? "text-red-500 font-semibold"
                               : "text-green-500 font-semibold"
                           }

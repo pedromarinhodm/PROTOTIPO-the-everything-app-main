@@ -1,431 +1,178 @@
-/**
- * API Service
- * Cliente HTTP para comunicação com o backend
- */
+import { Product, Movement, MovementFilter, DashboardStats } from '@/types/stock';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = 'http://localhost:3000/api';
 
-/**
- * Função auxiliar para fazer requisições HTTP
- */
-async function fetchAPI<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+// Utility function to download blob as file
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
 
-  const defaultHeaders: HeadersInit = {
-    'Content-Type': 'application/json',
+class ApiService {
+  private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+      ...options,
+    });
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Products
+  products = {
+    getAll: (search?: string): Promise<{ success: boolean; data: Product[]; count: number }> =>
+      this.request(`/produtos${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+
+    create: (product: Omit<Product, '_id' | 'createdAt' | 'updatedAt'>): Promise<{ success: boolean; produto: Product }> =>
+      this.request('/produtos', {
+        method: 'POST',
+        body: JSON.stringify(product),
+      }),
+
+    update: (id: string, product: Partial<Product>): Promise<{ success: boolean; produto: Product }> =>
+      this.request(`/produtos/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(product),
+      }),
+
+    delete: (id: string): Promise<{ success: boolean; message: string }> =>
+      this.request(`/produtos/${id}`, {
+        method: 'DELETE',
+      }),
   };
 
-  const config: RequestInit = {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
+  // Movements
+  movements = {
+    getAll: (filters?: MovementFilter): Promise<Movement[]> => {
+      const params = new URLSearchParams();
+      if (filters?.search) params.append('search', filters.search);
+      if (filters?.tipo) params.append('tipo', filters.tipo);
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+
+      return this.request(`/movimentacoes?${params.toString()}`);
+    },
+
+    createEntry: (entry: {
+      descricao: string;
+      quantidade: number;
+      unidade?: string;
+      servidor_almoxarifado: string;
+      data_entrada?: string;
+    }): Promise<{ success: boolean; message: string }> =>
+      this.request('/entrada', {
+        method: 'POST',
+        body: JSON.stringify(entry),
+      }),
+
+    createExit: (exit: {
+      produto_id: string;
+      quantidade: number;
+      servidor_almoxarifado: string;
+      data?: string;
+      setor_responsavel?: string;
+      servidor_retirada?: string;
+    }): Promise<{ success: boolean; message: string }> =>
+      this.request('/saida', {
+        method: 'POST',
+        body: JSON.stringify(exit),
+      }),
+  };
+
+  // Dashboard
+  dashboard = {
+    getStats: (): Promise<DashboardStats> =>
+      this.request<{ success: boolean; data: DashboardStats }>('/dashboard/stats').then(res => res.data),
+
+    getRecentMovements: (limit: number = 5): Promise<Movement[]> =>
+      this.request<{ success: boolean; data: Movement[] }>(`/dashboard/recent-movements?limit=${limit}`).then(res => res.data),
+
+    getLowStockProducts: (limit: number = 5): Promise<Product[]> =>
+      this.request<{ success: boolean; data: Product[] }>(`/dashboard/low-stock?limit=${limit}`).then(res => res.data),
+  };
+
+  // Files
+  files = {
+    getAll: (): Promise<{ _id: string; filename: string; length: number; uploadDate: string; metadata?: any }[]> =>
+      this.request('/formularios'),
+
+    upload: (formData: FormData): Promise<{ _id: string; filename: string; length: number; uploadDate: string }> => {
+      return fetch(`${API_BASE_URL}/formularios`, {
+        method: 'POST',
+        body: formData,
+      }).then(res => {
+        if (!res.ok) throw new Error(`Upload failed: ${res.statusText}`);
+        return res.json();
+      });
+    },
+
+    view: (fileId: string): Promise<Blob> =>
+      fetch(`${API_BASE_URL}/formularios/${fileId}/view`).then(res => res.blob()),
+
+    download: (fileId: string): Promise<Blob> =>
+      fetch(`${API_BASE_URL}/formularios/${fileId}/download`).then(res => res.blob()),
+
+    delete: (fileId: string): Promise<void> =>
+      this.request(`/formularios/${fileId}`, {
+        method: 'DELETE',
+      }),
+  };
+
+  // Reports
+  reports = {
+    getStockPDF: async (): Promise<void> => {
+      const response = await fetch(`${API_BASE_URL}/reports/estoque/pdf`);
+      if (!response.ok) throw new Error(`Failed to download stock PDF: ${response.statusText}`);
+      const blob = await response.blob();
+      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'relatorio-estoque.pdf';
+      downloadBlob(blob, filename);
+    },
+
+    getHistoryPDF: async (params?: {
+      type?: string;
+      startDate?: string;
+      endDate?: string;
+      search?: string;
+    }): Promise<void> => {
+      const searchParams = new URLSearchParams();
+      if (params?.type) searchParams.append('type', params.type);
+      if (params?.startDate) searchParams.append('startDate', params.startDate);
+      if (params?.endDate) searchParams.append('endDate', params.endDate);
+      if (params?.search) searchParams.append('search', params.search);
+
+      const response = await fetch(`${API_BASE_URL}/reports/historico/pdf?${searchParams.toString()}`);
+      if (!response.ok) throw new Error(`Failed to download history PDF: ${response.statusText}`);
+      const blob = await response.blob();
+      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'relatorio-historico.pdf';
+      downloadBlob(blob, filename);
+    },
+
+    getExcelReport: async (): Promise<void> => {
+      const response = await fetch(`${API_BASE_URL}/reports/excel`);
+      if (!response.ok) throw new Error(`Failed to download Excel report: ${response.statusText}`);
+      const blob = await response.blob();
+      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'relatorio-completo.xlsx';
+      downloadBlob(blob, filename);
     },
   };
-
-  try {
-    const response = await fetch(url, config);
-
-    // Para downloads de arquivos, retorna a resposta diretamente
-    if (options.headers && (options.headers as Record<string, string>)['Accept'] === 'application/octet-stream') {
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-      return response as unknown as T;
-    }
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || data.error || 'Erro na requisição');
-    }
-
-    return data;
-  } catch (error) {
-    console.error(`Erro na API (${endpoint}):`, error);
-    throw error;
-  }
 }
 
-// ==================== TYPES ====================
+export const api = new ApiService();
 
-export interface Product {
-  _id: string;
-  codigo: number;
-  descricao: string;
-  quantidade: number;
-  unidade: string;
-  descricao_complementar?: string;
-  validade?: string;
-  fornecedor?: string;
-  numero_processo?: string;
-  observacoes?: string;
-  totalEntries?: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Movement {
-  _id: string;
-  id: string;
-  produto: string;
-  produto_id: {
-    descricao: string;
-  };
-  tipo: 'entrada' | 'saida';
-  quantidade: number;
-  data: string;
-  servidor_almoxarifado?: string;
-  setor_responsavel?: string;
-  servidor_retirada?: string;
-  observacoes?: string;
-  createdAt: string;
-}
-
-export interface DashboardStats {
-  totalProducts: number;
-  totalEntries: number;
-  totalExits: number;
-  lowStockProducts: number;
-  totalMovements: number;
-}
-
-export interface APIResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-  count?: number;
-}
-
-export interface FileInfo {
-  _id: string;
-  fileId: string;
-  filename: string;
-  data_inicial: string;
-  data_final: string;
-  uploadDate: string;
-}
-
-// ==================== PRODUCTS API ====================
-
-export const productsAPI = {
-  /**
-   * Lista todos os produtos
-   */
-  async getAll(search?: string): Promise<Product[]> {
-    const response = await fetchAPI<APIResponse<Product[]>>('/api/produtos');
-    return response.data;
-  },
-
-  /**
-   * Obtém um produto por ID
-   */
-  async getById(id: string): Promise<Product> {
-    // Note: backend doesn't have individual product endpoint, so we'll filter from all
-    const products = await this.getAll();
-    const product = products.find(p => p._id === id);
-    if (!product) throw new Error('Produto não encontrado');
-    return product;
-  },
-
-  /**
-   * Cria um novo produto
-   */
-  async create(product: Omit<Product, '_id' | 'id' | 'codigo' | 'createdAt' | 'updatedAt'>): Promise<Product> {
-    const response = await fetchAPI<{ success: boolean; produto: Product }>('/api/produtos', {
-      method: 'POST',
-      body: JSON.stringify(product),
-    });
-    return response.produto;
-  },
-
-  /**
-   * Atualiza um produto
-   */
-  async update(id: string, product: Partial<Product>): Promise<Product> {
-    const response = await fetchAPI<{ success: boolean; produto: Product }>(`/api/produtos/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(product),
-    });
-    return response.produto;
-  },
-
-  /**
-   * Deleta um produto
-   */
-  async delete(id: string): Promise<void> {
-    await fetchAPI<{ success: boolean; message: string }>(`/api/produtos/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  /**
-   * Obtém o próximo código de produto
-   */
-  async getNextCode(): Promise<number> {
-    // Backend generates code automatically, so we'll return a placeholder
-    return 1;
-  },
-};
-
-// ==================== MOVEMENTS API ====================
-
-export interface EntryData {
-  descricao: string;
-  quantidade: number;
-  unidade: string;
-  servidor_almoxarifado: string;
-  data_entrada: string;
-}
-
-export interface ExitData {
-  produto_id: string;
-  quantidade: number;
-  servidor_almoxarifado: string;
-  data: string;
-  setor_responsavel: string;
-  servidor_retirada: string;
-}
-
-export interface MovementFilters {
-  search?: string;
-  tipo?: 'entrada' | 'saida' | 'all';
-  startDate?: string;
-  endDate?: string;
-  limit?: number;
-}
-
-export const movementsAPI = {
-  /**
-   * Lista movimentações com filtros
-   */
-  async getAll(filters?: MovementFilters): Promise<Movement[]> {
-    const params = new URLSearchParams();
-
-    if (filters?.search) params.append('search', filters.search);
-    if (filters?.tipo && filters.tipo !== 'all') params.append('tipo', filters.tipo);
-    if (filters?.startDate) params.append('startDate', filters.startDate);
-    if (filters?.endDate) params.append('endDate', filters.endDate);
-    if (filters?.limit) params.append('limit', filters.limit.toString());
-
-    const queryString = params.toString();
-    const endpoint = queryString ? `/api/movimentacoes?${queryString}` : '/api/movimentacoes';
-
-    const response = await fetchAPI<Movement[]>(endpoint);
-    return response;
-  },
-
-  /**
-   * Registra uma entrada
-   */
-  async createEntry(entry: EntryData): Promise<{ success: boolean; message: string }> {
-    const response = await fetchAPI<{ success: boolean; message: string }>('/api/entrada', {
-      method: 'POST',
-      body: JSON.stringify(entry),
-    });
-    return response;
-  },
-
-  /**
-   * Registra uma entrada simplificada (como no SCGES)
-   */
-  async createSimplifiedEntry(entry: {
-    produto: string;
-    quantidade: number;
-    data?: string;
-    observacoes?: string;
-  }): Promise<{ success: boolean; message: string }> {
-    const response = await fetchAPI<{ success: boolean; message: string }>('/api/entrada', {
-      method: 'POST',
-      body: JSON.stringify(entry),
-    });
-    return response;
-  },
-
-  /**
-   * Registra uma saída (como no SCGES)
-   */
-  async createSaida(exit: ExitData): Promise<{ success: boolean; message: string }> {
-    const response = await fetchAPI<{ success: boolean; message: string }>('/api/saida', {
-      method: 'POST',
-      body: JSON.stringify(exit),
-    });
-    return response;
-  },
-};
-
-// ==================== DASHBOARD API ====================
-
-export const dashboardAPI = {
-  /**
-   * Obtém estatísticas do dashboard
-   */
-  async getStats(): Promise<DashboardStats> {
-    const response = await fetchAPI<APIResponse<DashboardStats>>('/api/dashboard/stats');
-    return response.data;
-  },
-
-  /**
-   * Obtém movimentações recentes
-   */
-  async getRecentMovements(limit: number = 5): Promise<Movement[]> {
-    const response = await fetchAPI<APIResponse<Movement[]>>('/api/dashboard/recent-movements');
-    return response.data;
-  },
-
-  /**
-   * Obtém produtos com estoque baixo
-   */
-  async getLowStockProducts(limit: number = 5): Promise<Product[]> {
-    const response = await fetchAPI<APIResponse<Product[]>>('/api/dashboard/low-stock');
-    return response.data;
-  },
-};
-
-// ==================== REPORTS API ====================
-
-export const reportsAPI = {
-  /**
-   * Gera e baixa relatório de estoque em PDF
-   */
-  async downloadStockPDF(): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/reports/estoque/pdf`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      throw new Error('Erro ao gerar relatório PDF');
-    }
-
-    // Cria um blob e força o download
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'relatorio-estoque.pdf';
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  },
-
-  /**
-   * Gera e baixa relatório de histórico em PDF
-   */
-  async downloadHistoryPDF(filters?: { type?: string; startDate?: string; endDate?: string; search?: string }): Promise<void> {
-    const params = new URLSearchParams();
-    if (filters?.type) params.append('type', filters.type);
-    if (filters?.startDate) params.append('startDate', filters.startDate);
-    if (filters?.endDate) params.append('endDate', filters.endDate);
-    if (filters?.search) params.append('search', filters.search);
-
-    const url = `${API_BASE_URL}/api/reports/historico/pdf${params.toString() ? '?' + params.toString() : ''}`;
-
-    const response = await fetch(url, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      throw new Error('Erro ao gerar relatório PDF');
-    }
-
-    // Cria um blob e força o download
-    const blob = await response.blob();
-    const urlBlob = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = urlBlob;
-    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'relatorio-historico.pdf';
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(urlBlob);
-    document.body.removeChild(a);
-  },
-
-  /**
-   * Gera e baixa relatório completo em Excel (não implementado no backend)
-   */
-  async downloadExcel(): Promise<void> {
-    // TODO: Implement Excel generation
-    throw new Error('Relatório Excel não implementado');
-  },
-};
-
-// ==================== FILES API ====================
-
-export const filesAPI = {
-  /**
-   * Lista todos os arquivos armazenados
-   */
-  async getAll(): Promise<FileInfo[]> {
-    const response = await fetchAPI<FileInfo[]>('/api/formularios');
-    return response;
-  },
-
-  /**
-   * Baixa um arquivo por ID
-   */
-  async download(id: string): Promise<void> {
-    const url = `${API_BASE_URL}/api/formularios/${id}/download`;
-    window.open(url, '_blank');
-  },
-
-  /**
-   * Deleta um arquivo
-   */
-  async delete(id: string): Promise<void> {
-    await fetchAPI<{ success: boolean }>(`/api/formularios/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  /**
-   * Faz upload de arquivo (multipart/form-data). Campo esperado: 'arquivo' (File),
-   * e campos adicionais: 'data_inicial', 'data_final'
-   */
-  async upload(fd: FormData): Promise<{ message: string; id: string }>{
-    const url = `${API_BASE_URL}/api/formularios`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      body: fd,
-      // não definir Content-Type: o browser faz o boundary automaticamente
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || data.message || 'Erro ao enviar arquivo');
-
-    return data;
-  },
-};
-
-// ==================== HEALTH CHECK ====================
-
-export const healthAPI = {
-  /**
-   * Verifica se a API está online
-   */
-  async check(): Promise<boolean> {
-    try {
-      // Try to fetch products as health check
-      await fetchAPI('/api/produtos');
-      return true;
-    } catch {
-      return false;
-    }
-  },
-};
-
-// Export default API object
-export const api = {
-  products: productsAPI,
-  movements: movementsAPI,
-  dashboard: dashboardAPI,
-  reports: reportsAPI,
-  files: filesAPI,
-  health: healthAPI,
-};
-
-export default api;
+// Re-export types for convenience
+export type { Product, Movement, MovementFilter, DashboardStats } from '@/types/stock';

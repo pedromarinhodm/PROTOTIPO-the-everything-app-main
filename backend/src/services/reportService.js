@@ -8,7 +8,6 @@ import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
 import Product from '../models/Product.js';
 import Movement from '../models/Movement.js';
-import gridfs from '../gridfs/gridfsStorage.js';
 
 /**
  * Gera relatório de estoque em PDF

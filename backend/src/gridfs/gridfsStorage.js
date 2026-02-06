@@ -105,7 +105,7 @@ const deleteFromGridFS = async (fileId) => {
   console.log(`🗑️ Arquivo deletado do GridFS: ${fileId}`);
 };
 
-export default {
+export {
   initGridFS,
   getBucket,
   saveToGridFS,

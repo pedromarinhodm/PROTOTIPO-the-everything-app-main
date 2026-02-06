@@ -3,18 +3,18 @@
  * Endpoints REST para produtos
  */
 
-const productService = require('../services/productService');
-const movementService = require('../services/movementService');
+import productService from '../services/productService.js';
+import movementService from '../services/movementService.js';
 
 /**
- * GET /api/products
- * Lista todos os produtos
+ * GET /api/produtos
+ * Lista todos os produtos com busca opcional
  */
 const getProducts = async (req, res) => {
   try {
     const { search } = req.query;
     const products = await productService.getAllProducts(search);
-    
+
     res.json({
       success: true,
       data: products,
@@ -31,13 +31,14 @@ const getProducts = async (req, res) => {
 };
 
 /**
- * GET /api/products/:id
+ * GET /api/produtos/:id
  * Obtém um produto por ID
  */
 const getProduct = async (req, res) => {
   try {
-    const product = await productService.getProductById(req.params.id);
-    
+    const { id } = req.params;
+    const product = await productService.getProductById(id);
+
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -50,23 +51,24 @@ const getProduct = async (req, res) => {
       data: product,
     });
   } catch (error) {
-    console.error('Erro ao buscar produto:', error);
+    console.error('Erro ao obter produto:', error);
     res.status(500).json({
       success: false,
-      error: 'Erro ao buscar produto',
+      error: 'Erro ao obter produto',
       message: error.message,
     });
   }
 };
 
 /**
- * POST /api/products
+ * POST /api/produtos
  * Cria um novo produto
  */
 const createProduct = async (req, res) => {
   try {
-    const product = await productService.createProduct(req.body);
-    
+    const productData = req.body;
+    const product = await productService.createProduct(productData);
+
     res.status(201).json({
       success: true,
       data: product,
@@ -83,13 +85,15 @@ const createProduct = async (req, res) => {
 };
 
 /**
- * PUT /api/products/:id
+ * PUT /api/produtos/:id
  * Atualiza um produto
  */
 const updateProduct = async (req, res) => {
   try {
-    const product = await productService.updateProduct(req.params.id, req.body);
-    
+    const { id } = req.params;
+    const updateData = req.body;
+    const product = await productService.updateProduct(id, updateData);
+
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -113,13 +117,19 @@ const updateProduct = async (req, res) => {
 };
 
 /**
- * DELETE /api/products/:id
+ * DELETE /api/produtos/:id
  * Deleta um produto
  */
 const deleteProduct = async (req, res) => {
   try {
-    const product = await productService.deleteProduct(req.params.id);
+    const { id } = req.params;
     
+    // Primeiro deleta as movimentações relacionadas
+    await movementService.deleteMovementsByProduct(id);
+    
+    // Depois deleta o produto
+    const product = await productService.deleteProduct(id);
+
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -127,12 +137,9 @@ const deleteProduct = async (req, res) => {
       });
     }
 
-    // Remove movimentações relacionadas
-    await movementService.deleteMovementsByProduct(req.params.id);
-
     res.json({
       success: true,
-      message: 'Produto excluído com sucesso',
+      message: 'Produto deletado com sucesso',
     });
   } catch (error) {
     console.error('Erro ao deletar produto:', error);
@@ -145,28 +152,27 @@ const deleteProduct = async (req, res) => {
 };
 
 /**
- * GET /api/products/next-code
- * Obtém o próximo código de produto
+ * GET /api/produtos/next-code
+ * Obtém o próximo código disponível
  */
 const getNextCode = async (req, res) => {
   try {
-    const code = await productService.getNextProductCode();
-    
+    const nextCode = await productService.getNextProductCode();
     res.json({
       success: true,
-      data: { code },
+      data: { nextCode },
     });
   } catch (error) {
-    console.error('Erro ao gerar código:', error);
+    console.error('Erro ao obter próximo código:', error);
     res.status(500).json({
       success: false,
-      error: 'Erro ao gerar código',
+      error: 'Erro ao obter próximo código',
       message: error.message,
     });
   }
 };
 
-module.exports = {
+export default {
   getProducts,
   getProduct,
   createProduct,

@@ -1,29 +1,29 @@
 /**
- * Routes: File
- * Rotas da API de arquivos (GridFS)
+ * Routes: Formularios
+ * Rotas da API de formulários (GridFS)
  */
 
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const fileController = require('../controllers/fileController');
-const multer = require('multer');
+import fileController from '../controllers/fileController.js';
+import multer from 'multer';
 
 // multer em memória
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage() });
 
-// GET /api/files - Lista todos os arquivos
+// GET /api/formularios - Lista todos os formulários
 router.get('/', fileController.getFiles);
 
-// POST /api/files - Upload de arquivo (campo 'arquivo')
+// POST /api/formularios - Upload de formulário (campo 'arquivo')
 router.post('/', upload.single('arquivo'), fileController.uploadFile);
 
-// GET /api/files/:id/view - Visualizar arquivo inline (PDF)
+// GET /api/formularios/:id/view - Visualizar formulário inline (PDF)
 router.get('/:id/view', fileController.viewFile);
 
-// GET /api/files/:id - Download de arquivo
-router.get('/:id', fileController.downloadFile);
+// GET /api/formularios/:id/download - Download de formulário
+router.get('/:id/download', fileController.downloadFile);
 
-// DELETE /api/files/:id - Deleta arquivo
+// DELETE /api/formularios/:id - Deleta formulário
 router.delete('/:id', fileController.deleteFile);
 
-module.exports = router;
+export default router;

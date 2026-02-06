@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FileDown, FileText, Trash2, Plus } from "lucide-react";
+import { FileUpload } from "../components/ui/file-upload";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 
@@ -50,15 +51,16 @@ export default function Formularios() {
   function filtrarLista() {
     return lista.filter((f) => {
       if (!filterIni && !filterFim) return true;
-      const upload = f.uploadDate ? new Date(f.uploadDate) : null;
-      if (!upload) return false;
+      const dataIni = f.data_inicial ? new Date(f.data_inicial + 'T00:00:00') : null;
+      const dataFim = f.data_final ? new Date(f.data_final + 'T00:00:00') : null;
+      if (!dataIni || !dataFim) return false;
       if (filterIni) {
         const di = new Date(`${filterIni}T00:00:00`);
-        if (upload < di) return false;
+        if (dataIni < di) return false;
       }
       if (filterFim) {
         const df = new Date(`${filterFim}T23:59:59`);
-        if (upload > df) return false;
+        if (dataFim > df) return false;
       }
       return true;
     });
@@ -66,9 +68,15 @@ export default function Formularios() {
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
+    console.log("Form submitted", { fileInput, dataInicial, dataFinal });
 
     if (!fileInput) {
       toast.error("Selecione um arquivo PDF para enviar");
+      return;
+    }
+
+    if (!dataInicial || !dataFinal) {
+      toast.error("Preencha as datas inicial e final");
       return;
     }
 
@@ -78,7 +86,9 @@ export default function Formularios() {
     fd.append("data_final", dataFinal);
 
     try {
-      await api.files.upload(fd);
+      console.log("Sending upload request...");
+      const result = await api.files.upload(fd);
+      console.log("Upload result:", result);
       toast.success("Formulário anexado com sucesso!");
       setOpenModal(false);
       setFileInput(null);
@@ -86,7 +96,7 @@ export default function Formularios() {
       setDataFinal("");
       carregar();
     } catch (err: any) {
-      console.error(err);
+      console.error("Upload error:", err);
       toast.error(err?.message || "Erro ao anexar formulário");
     }
   }
@@ -124,10 +134,6 @@ export default function Formularios() {
         description="Anexe, visualize e gerencie formulários em PDF"
         action={
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => { setFilterIni(""); setFilterFim(""); }}>
-              Limpar Filtros
-            </Button>
-
             <Dialog open={openModal} onOpenChange={setOpenModal}>
               <DialogTrigger asChild>
                 <Button>
@@ -155,7 +161,13 @@ export default function Formularios() {
 
                     <div>
                       <Label>Arquivo (PDF)</Label>
-                      <input accept="application/pdf" onChange={(e) => setFileInput(e.target.files?.[0] ?? null)} type="file" className="mt-2" />
+                      <FileUpload
+                        selectedFile={fileInput}
+                        onFileSelect={setFileInput}
+                        accept="application/pdf"
+                        maxSize={10}
+                        className="mt-2"
+                      />
                     </div>
                   </div>
 
@@ -174,11 +186,11 @@ export default function Formularios() {
         <CardContent>
           <div className="grid grid-cols-4 gap-4">
             <div>
-              <Label>Data Inicial (Upload)</Label>
+              <Label>Data Inicial</Label>
               <Input type="date" value={filterIni} onChange={(e) => setFilterIni(e.target.value)} />
             </div>
             <div>
-              <Label>Data Final (Upload)</Label>
+              <Label>Data Final</Label>
               <Input type="date" value={filterFim} onChange={(e) => setFilterFim(e.target.value)} />
             </div>
             <div className="col-span-2 flex items-end justify-end">

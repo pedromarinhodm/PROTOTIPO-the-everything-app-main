@@ -11,7 +11,7 @@ import productService from './productService.js';
  * Registra uma entrada de estoque
  */
 const createEntry = async (entryData) => {
-  const { produto, quantidade, data, observacoes } = entryData;
+  const { produto, quantidade, data, servidor_almoxarifado, observacoes } = entryData;
 
   // Procura produto existente pela descrição
   let existingProduct = await Product.findOne({
@@ -32,11 +32,11 @@ const createEntry = async (entryData) => {
 
   // Cria registro de movimentação
   const movement = new Movement({
-    produto,
+    produto_id: existingProduct._id,
     tipo: 'entrada',
     quantidade,
     data: data || new Date(),
-    observacoes: observacoes || '',
+    servidor_almoxarifado: servidor_almoxarifado || 'Sistema',
   });
 
   await movement.save();
@@ -174,8 +174,8 @@ const getMovementStats = async () => {
 /**
  * Deleta movimentações de um produto
  */
-const deleteMovementsByProduct = async (produto) => {
-  await Movement.deleteMany({ produto: { $regex: new RegExp(`^${produto}$`, 'i') } });
+const deleteMovementsByProduct = async (produtoId) => {
+  await Movement.deleteMany({ produto_id: produtoId });
 };
 
 export default {
