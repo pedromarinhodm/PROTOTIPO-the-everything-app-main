@@ -188,9 +188,7 @@ export default function Products() {
     product.codigo.toString().includes(searchQuery)
   );
 
-  // Calculate total stock and 30% threshold for low stock alert
-  const totalStock = products.reduce((sum, p) => sum + (p.quantidade || 0), 0);
-  const lowStockThreshold = totalStock * 0.30;
+
 
   const resetForm = () => {
     setFormData({
@@ -403,7 +401,7 @@ export default function Products() {
                       <TableCell className="text-center align-middle">
                         <span
                           className={
-                            product.quantidade <= lowStockThreshold
+                            (product.totalEntradas || 0) > 0 && product.quantidade <= (product.totalEntradas || 0) * 0.30
                               ? "text-red-500 font-semibold"
                               : "text-green-500 font-semibold"
                           }
@@ -411,6 +409,7 @@ export default function Products() {
                           {product.quantidade}
                         </span>
                       </TableCell>
+
                       <TableCell className="text-center align-middle">{product.unidade}</TableCell>
                       <TableCell className="text-muted-foreground text-center align-middle">
                         {product.fornecedor || "-"}
@@ -422,21 +421,25 @@ export default function Products() {
                             size="icon"
                             onClick={() => openDetailsDialog(product)}
                             title="Ver detalhes"
+                            className="hover:bg-green-500"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
+
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => openEditDialog(product)}
                             title="Editar"
+                            className="hover:bg-blue-500"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
+
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-destructive hover:text-destructive"
+                            className="text-destructive hover:text-destructive hover:bg-red-400"
                             onClick={() => setDeleteProductId(product._id)}
                             title="Excluir"
                           >

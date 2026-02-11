@@ -26,7 +26,18 @@ const calculateProductQuantity = async (productId) => {
 };
 
 /**
- * Adiciona quantidade calculada a um produto ou array de produtos
+ * Calcula o total de entradas de um produto
+ * @param {string} productId - ID do produto
+ * @returns {Promise<number>} - Total de entradas
+ */
+const calculateTotalEntries = async (productId) => {
+  const movements = await Movement.find({ produto_id: productId, tipo: 'entrada' });
+  
+  return movements.reduce((sum, m) => sum + m.quantidade, 0);
+};
+
+/**
+ * Adiciona quantidade calculada e total de entradas a um produto ou array de produtos
  */
 const addCalculatedQuantity = async (productOrProducts) => {
   if (Array.isArray(productOrProducts)) {
@@ -34,9 +45,11 @@ const addCalculatedQuantity = async (productOrProducts) => {
     const productsWithQuantity = await Promise.all(
       productOrProducts.map(async (product) => {
         const quantity = await calculateProductQuantity(product._id);
+        const totalEntries = await calculateTotalEntries(product._id);
         return {
           ...product.toObject(),
-          quantidade: quantity
+          quantidade: quantity,
+          totalEntradas: totalEntries
         };
       })
     );
@@ -44,9 +57,11 @@ const addCalculatedQuantity = async (productOrProducts) => {
   } else {
     // Processar produto único
     const quantity = await calculateProductQuantity(productOrProducts._id);
+    const totalEntries = await calculateTotalEntries(productOrProducts._id);
     return {
       ...productOrProducts.toObject(),
-      quantidade: quantity
+      quantidade: quantity,
+      totalEntradas: totalEntries
     };
   }
 };

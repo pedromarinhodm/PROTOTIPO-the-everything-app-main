@@ -11,6 +11,7 @@ export interface Product {
   observacoes?: string;
   nota_fiscal_id?: string;
   nota_fiscal_filename?: string;
+  totalEntradas?: number;
   createdAt: string;
   updatedAt: string;
 }
