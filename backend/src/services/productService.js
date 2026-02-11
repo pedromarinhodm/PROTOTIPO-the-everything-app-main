@@ -202,6 +202,14 @@ const getStockStats = async () => {
 };
 
 /**
+ * Obtém setores únicos dos produtos
+ */
+const getUniqueSetores = async () => {
+  const setores = await Product.distinct('setor');
+  return setores.filter(setor => setor && setor.trim() !== '');
+};
+
+/**
  * Obtém produtos com estoque baixo
  */
 const getLowStockProducts = async (limit = 10) => {
@@ -249,4 +257,5 @@ export default {
   getStockStats,
   getLowStockProducts,
   calculateProductQuantity,
+  getUniqueSetores,
 };

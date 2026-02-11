@@ -124,30 +124,62 @@ const createExit = async (exitData) => {
  * Lista movimentações com filtros
  */
 const getMovements = async (filters = {}) => {
-  const { search, tipo, startDate, endDate, limit } = filters;
+  const { search, tipo, startDate, endDate, limit, productId, setor } = filters;
 
-  let matchConditions = {};
+  let preLookupMatch = {}; // Filtros antes do $lookup
+  let postLookupMatch = {}; // Filtros depois do $lookup
 
   // Filtro por tipo
-  if (tipo && tipo !== 'all') {
-    matchConditions.tipo = tipo;
+  if (tipo && tipo !== 'all' && tipo !== 'ambos') {
+    preLookupMatch.tipo = tipo;
   }
 
-  // Filtro por data
+  // Filtro por produto (productId) - aplicado antes do lookup
+  if (productId && productId !== 'todos') {
+    try {
+      const { ObjectId } = await import('mongodb');
+      preLookupMatch.produto_id = new ObjectId(productId);
+    } catch (e) {
+      preLookupMatch.produto_id = productId;
+    }
+  }
+
+  // Filtro por setor - aplicado antes do lookup
+  if (setor && setor !== 'todos') {
+    preLookupMatch.$or = [
+      { setor_responsavel: setor },
+      { setor: setor }
+    ];
+  }
+
+  // Filtro por data - aplicado antes do lookup
   if (startDate || endDate) {
-    matchConditions.data = {};
+    preLookupMatch.data = {};
     if (startDate) {
-      matchConditions.data.$gte = new Date(startDate);
+      preLookupMatch.data.$gte = new Date(startDate);
     }
     if (endDate) {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
-      matchConditions.data.$lte = end;
+      preLookupMatch.data.$lte = end;
     }
   }
 
+  // Filtro de busca por descrição do produto - aplicado depois do lookup
+  if (search) {
+    postLookupMatch['produto_id.descricao'] = { $regex: search, $options: 'i' };
+  }
+
   // Construir pipeline de agregação
-  let pipeline = [
+  let pipeline = [];
+
+  // 1. Aplicar filtros antes do lookup (mais eficiente)
+  if (Object.keys(preLookupMatch).length > 0) {
+    pipeline.push({ $match: preLookupMatch });
+  }
+
+  // 2. Fazer lookup para produtos
+  pipeline.push(
     {
       $lookup: {
         from: 'produtos',
@@ -159,39 +191,28 @@ const getMovements = async (filters = {}) => {
     {
       $unwind: '$produto_id'
     }
-  ];
+  );
 
-  // Adicionar filtro de busca se fornecido
-  if (search) {
-    pipeline.push({
-      $match: {
-        ...matchConditions,
-        'produto_id.descricao': { $regex: search, $options: 'i' }
-      }
-    });
-  } else if (Object.keys(matchConditions).length > 0) {
-    pipeline.push({
-      $match: matchConditions
-    });
+  // 3. Aplicar filtros depois do lookup (busca por descrição)
+  if (Object.keys(postLookupMatch).length > 0) {
+    pipeline.push({ $match: postLookupMatch });
   }
 
-  // Ordenação: primeiro por data (sem horário), depois por createdAt
-  // Usando $dateTrunc para ignorar o horário na ordenação
+  // 4. Adicionar campo dataDia para ordenação
   pipeline.push({
     $addFields: {
       dataDia: { $dateTrunc: { date: "$data", unit: "day" } }
     }
   });
-  
+
+  // 5. Ordenação
   pipeline.push({
     $sort: { dataDia: -1, createdAt: -1 }
   });
 
-  // Limitação se especificada
+  // 6. Limitação se especificada
   if (limit) {
-    pipeline.push({
-      $limit: limit
-    });
+    pipeline.push({ $limit: limit });
   }
 
   const movements = await Movement.aggregate(pipeline);

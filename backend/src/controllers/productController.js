@@ -214,6 +214,27 @@ const getNextCode = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/produtos/setores
+ * Obtém lista de setores únicos
+ */
+const getSetores = async (req, res) => {
+  try {
+    const setores = await productService.getUniqueSetores();
+    res.json({
+      success: true,
+      data: setores,
+    });
+  } catch (error) {
+    console.error('Erro ao obter setores:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao obter setores',
+      message: error.message,
+    });
+  }
+};
+
 export default {
   getProducts,
   getProduct,
@@ -221,4 +242,5 @@ export default {
   updateProduct,
   deleteProduct,
   getNextCode,
+  getSetores,
 };

@@ -63,6 +63,7 @@ app.use((req, res, next) => {
 // =====================================
 app.get('/api/produtos', productController.getProducts);
 app.get('/api/produtos/next-code', productController.getNextCode);
+app.get('/api/produtos/setores', productController.getSetores);
 app.get('/api/produtos/:id', productController.getProduct);
 app.post('/api/produtos', productController.createProduct);
 app.put('/api/produtos/:id', upload.single('nota_fiscal'), productController.updateProduct);

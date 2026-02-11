@@ -82,6 +82,23 @@ class ApiService {
       return this.request(`/movimentacoes?${params.toString()}`);
     },
 
+    getFiltered: (filters: {
+      startDate?: string;
+      endDate?: string;
+      tipo?: string;
+      productId?: string;
+      setor?: string;
+    }): Promise<Movement[]> => {
+      const params = new URLSearchParams();
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+      if (filters?.tipo && filters.tipo !== 'ambos') params.append('tipo', filters.tipo);
+      if (filters?.productId && filters.productId !== 'todos') params.append('productId', filters.productId);
+      if (filters?.setor && filters.setor !== 'todos') params.append('setor', filters.setor);
+
+      return this.request(`/movimentacoes?${params.toString()}`);
+    },
+
     createEntry: (entry: {
       produto: string;
       quantidade: number;
@@ -161,6 +178,12 @@ class ApiService {
       this.request(`/formularios/${fileId}`, {
         method: 'DELETE',
       }),
+  };
+
+  // Setores
+  setores = {
+    getAll: (): Promise<string[]> =>
+      this.request<{ success: boolean; data: string[] }>('/produtos/setores').then(res => res.data),
   };
 
   // Reports

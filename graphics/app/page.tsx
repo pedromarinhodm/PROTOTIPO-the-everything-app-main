@@ -1,5 +1,13 @@
+"use client";
+
 import { useState, useEffect } from "react";
-import { Package, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Activity } from "lucide-react";
+import {
+  Package,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  AlertTriangle,
+  Activity,
+} from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
@@ -9,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Product, Movement, DashboardStats } from "@/types/stock";
+import type { Product, Movement, DashboardStats } from "@/types/stock";
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>({
@@ -50,11 +58,11 @@ export default function Dashboard() {
     <MainLayout>
       <PageHeader
         title="Dashboard"
-        description="Visão geral do estoque e movimentações"
+        description="Visao geral do estoque e movimentacoes"
       />
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           title="Total de Produtos"
           value={loading ? 0 : stats.totalProducts}
@@ -70,38 +78,38 @@ export default function Dashboard() {
           description="Unidades recebidas"
         />
         <StatsCard
-          title="Total de Saídas"
+          title="Total de Saidas"
           value={loading ? 0 : stats.totalExits}
           icon={ArrowUpFromLine}
           variant="destructive"
-          description="Unidades distribuídas"
+          description="Unidades distribuidas"
         />
         <StatsCard
           title="Estoque Baixo"
           value={loading ? 0 : stats.lowStockProducts}
           icon={AlertTriangle}
           variant="warning"
-          description="Produtos com ≤30%"
+          description={"Produtos com \u226430%"}
         />
       </div>
 
-      {/* Charts Section */}
+      {/* Charts Section - positioned right after stats */}
       <DashboardCharts />
 
       {/* Content Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent Movements */}
-        <Card className="animate-slide-in-left">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
               <Activity className="h-5 w-5 text-primary" />
-              Movimentações Recentes
+              Movimentacoes Recentes
             </CardTitle>
           </CardHeader>
           <CardContent>
             {recentMovements.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Nenhuma movimentação registrada
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Nenhuma movimentacao registrada
               </p>
             ) : (
               <div className="space-y-3">
@@ -112,22 +120,29 @@ export default function Dashboard() {
                   >
                     <div className="flex items-center gap-3">
                       <Badge
-                        variant={movement.tipo === "entrada" ? "accent" : "destructive"}
+                        variant={
+                          movement.tipo === "entrada"
+                            ? "default"
+                            : "destructive"
+                        }
                         className="capitalize"
                       >
                         {movement.tipo}
                       </Badge>
                       <div>
-                        <p className="font-medium text-sm">
+                        <p className="text-sm font-medium">
                           {movement.produto_id.descricao}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(movement.data), "dd/MM/yyyy", { locale: ptBR })}
+                          {format(new Date(movement.data), "dd/MM/yyyy", {
+                            locale: ptBR,
+                          })}
                         </p>
                       </div>
                     </div>
-                    <span className="font-semibold text-sm">
-                      {movement.tipo === "entrada" ? "+" : "-"}{movement.quantidade}
+                    <span className="text-sm font-semibold">
+                      {movement.tipo === "entrada" ? "+" : "-"}
+                      {movement.quantidade}
                     </span>
                   </div>
                 ))}
@@ -137,16 +152,16 @@ export default function Dashboard() {
         </Card>
 
         {/* Low Stock Alert */}
-        <Card className="animate-slide-in-left" style={{ animationDelay: "0.1s" }}>
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-warning" />
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+              <AlertTriangle className="h-5 w-5 text-chart-4" />
               Alertas de Estoque Baixo
             </CardTitle>
           </CardHeader>
           <CardContent>
             {lowStockProducts.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
+              <p className="py-8 text-center text-sm text-muted-foreground">
                 Nenhum produto com estoque baixo
               </p>
             ) : (
@@ -154,15 +169,19 @@ export default function Dashboard() {
                 {lowStockProducts.map((product) => (
                   <div
                     key={product._id}
-                    className="flex items-center justify-between rounded-lg border border-warning/30 bg-warning/5 p-3"
+                    className="flex items-center justify-between rounded-lg border border-chart-4/30 bg-chart-4/5 p-3"
                   >
                     <div>
-                      <p className="font-medium text-sm">{product.descricao}</p>
+                      <p className="text-sm font-medium">{product.descricao}</p>
                       <p className="text-xs text-muted-foreground">
-                        Código: {product.codigo}
+                        {"Codigo: "}
+                        {product.codigo}
                       </p>
                     </div>
-                    <Badge variant="outline" className="border-warning text-warning">
+                    <Badge
+                      variant="outline"
+                      className="border-chart-4 text-chart-4"
+                    >
                       {product.quantidade} {product.unidade}
                     </Badge>
                   </div>
@@ -174,14 +193,17 @@ export default function Dashboard() {
       </div>
 
       {/* Welcome message if empty */}
-      {stats.totalProducts === 0 && (
+      {stats.totalProducts === 0 && !loading && (
         <Card className="mt-8 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Package className="h-16 w-16 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Bem-vindo ao SCGES!</h3>
-            <p className="text-muted-foreground max-w-md">
-              Sistema de Controle e Gerenciamento de Estoque da SEMSC. 
-              Comece cadastrando produtos ou registrando entradas no almoxarifado.
+            <Package className="mb-4 h-16 w-16 text-muted-foreground/50" />
+            <h3 className="mb-2 text-lg font-semibold text-foreground">
+              {"Bem-vindo ao SCGES!"}
+            </h3>
+            <p className="max-w-md text-muted-foreground">
+              {
+                "Sistema de Controle e Gerenciamento de Estoque da SEMSC. Comece cadastrando produtos ou registrando entradas no almoxarifado."
+              }
             </p>
           </CardContent>
         </Card>
