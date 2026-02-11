@@ -5,6 +5,7 @@
 
 import productService from '../services/productService.js';
 import movementService from '../services/movementService.js';
+import { saveToProductFilesGridFS, deleteFromProductFilesGridFS } from '../gridfs/gridfsStorage.js';
 
 /**
  * GET /api/produtos
@@ -86,24 +87,65 @@ const createProduct = async (req, res) => {
 
 /**
  * PUT /api/produtos/:id
- * Atualiza um produto
+ * Atualiza um produto (com suporte a upload de nota fiscal)
  */
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
-    const product = await productService.updateProduct(id, updateData);
-
-    if (!product) {
+    const updateData = { ...req.body };
+    
+    // Busca produto atual para verificar nota fiscal existente
+    const currentProduct = await productService.getProductById(id);
+    if (!currentProduct) {
       return res.status(404).json({
         success: false,
         error: 'Produto não encontrado',
       });
     }
 
+    // Se há um novo arquivo de nota fiscal
+    if (req.file) {
+      // Valida tipo do arquivo (apenas PDF)
+      if (req.file.mimetype !== 'application/pdf') {
+        return res.status(400).json({
+          success: false,
+          error: 'Apenas arquivos PDF são permitidos para nota fiscal',
+        });
+      }
+
+      // Se já existe uma nota fiscal, deleta a antiga
+      if (currentProduct.nota_fiscal_id) {
+        try {
+          await deleteFromProductFilesGridFS(currentProduct.nota_fiscal_id);
+        } catch (err) {
+          console.log('Nota fiscal anterior não encontrada ou erro ao deletar:', err.message);
+        }
+      }
+
+      // Salva nova nota fiscal no GridFS (bucket product_files)
+      const filename = Date.now() + '-' + req.file.originalname;
+      const fileId = await saveToProductFilesGridFS(req.file.buffer, filename, {
+        tipo: 'nota_fiscal',
+        produto_id: id,
+        uploadDate: new Date(),
+      });
+
+      // Adiciona referência da nota fiscal aos dados de atualização
+      updateData.nota_fiscal_id = fileId.toString();
+      updateData.nota_fiscal_filename = req.file.originalname;
+    }
+
+    // Remove campos que não devem ser atualizados diretamente
+    delete updateData._id;
+    delete updateData.codigo;
+    delete updateData.createdAt;
+    delete updateData.quantidade; // Quantidade é calculada dinamicamente das movimentações
+
+    const product = await productService.updateProduct(id, updateData);
+
     res.json({
       success: true,
-      data: product,
+      produto: product,
       message: 'Produto atualizado com sucesso',
     });
   } catch (error) {

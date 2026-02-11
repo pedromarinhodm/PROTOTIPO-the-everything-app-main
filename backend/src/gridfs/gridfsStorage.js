@@ -6,32 +6,58 @@
 import mongoose from 'mongoose';
 import { GridFSBucket } from 'mongodb';
 
-let bucket;
+let formulariosBucket;
+let productFilesBucket;
 
 /**
- * Inicializa o GridFS bucket
+ * Inicializa os buckets GridFS
  */
 const initGridFS = () => {
   const db = mongoose.connection.db;
-  bucket = new GridFSBucket(db, {
+  
+  // Bucket para formulários
+  formulariosBucket = new GridFSBucket(db, {
     bucketName: 'formularios'
   });
-  console.log('✅ GridFS inicializado');
-  return bucket;
+  
+  // Bucket para arquivos de produtos (notas fiscais)
+  productFilesBucket = new GridFSBucket(db, {
+    bucketName: 'product_files'
+  });
+  
+  console.log('✅ GridFS inicializado (formularios + product_files)');
+  return { formulariosBucket, productFilesBucket };
 };
 
 /**
- * Obtém o bucket GridFS
+ * Obtém o bucket de formulários
+ */
+const getFormulariosBucket = () => {
+  if (!formulariosBucket) {
+    initGridFS();
+  }
+  return formulariosBucket;
+};
+
+/**
+ * Obtém o bucket de arquivos de produtos
+ */
+const getProductFilesBucket = () => {
+  if (!productFilesBucket) {
+    initGridFS();
+  }
+  return productFilesBucket;
+};
+
+/**
+ * Obtém o bucket GridFS (padrão: formularios)
  */
 const getBucket = () => {
-  if (!bucket) {
-    return initGridFS();
-  }
-  return bucket;
+  return getFormulariosBucket();
 };
 
 /**
- * Salva um buffer no GridFS
+ * Salva um buffer no GridFS (bucket de formulários)
  * @param {Buffer} buffer - Conteúdo do arquivo
  * @param {string} filename - Nome do arquivo
  * @param {object} metadata - Metadados adicionais
@@ -39,7 +65,7 @@ const getBucket = () => {
  */
 const saveToGridFS = (buffer, filename, metadata = {}) => {
   return new Promise((resolve, reject) => {
-    const bucket = getBucket();
+    const bucket = getFormulariosBucket();
     
     const uploadStream = bucket.openUploadStream(filename, {
       metadata: {
@@ -54,7 +80,7 @@ const saveToGridFS = (buffer, filename, metadata = {}) => {
     });
 
     uploadStream.on('finish', () => {
-      console.log(`✅ Arquivo salvo no GridFS: ${filename} (ID: ${uploadStream.id})`);
+      console.log(`✅ Arquivo salvo no GridFS (formularios): ${filename} (ID: ${uploadStream.id})`);
       resolve(uploadStream.id);
     });
 
@@ -63,12 +89,44 @@ const saveToGridFS = (buffer, filename, metadata = {}) => {
 };
 
 /**
- * Obtém um arquivo do GridFS por ID
+ * Salva um buffer no GridFS (bucket de arquivos de produtos)
+ * @param {Buffer} buffer - Conteúdo do arquivo
+ * @param {string} filename - Nome do arquivo
+ * @param {object} metadata - Metadados adicionais
+ * @returns {Promise<ObjectId>} - ID do arquivo salvo
+ */
+const saveToProductFilesGridFS = (buffer, filename, metadata = {}) => {
+  return new Promise((resolve, reject) => {
+    const bucket = getProductFilesBucket();
+    
+    const uploadStream = bucket.openUploadStream(filename, {
+      metadata: {
+        ...metadata,
+        uploadDate: new Date(),
+      }
+    });
+
+    uploadStream.on('error', (error) => {
+      console.error('❌ Erro ao salvar no GridFS (product_files):', error);
+      reject(error);
+    });
+
+    uploadStream.on('finish', () => {
+      console.log(`✅ Arquivo salvo no GridFS (product_files): ${filename} (ID: ${uploadStream.id})`);
+      resolve(uploadStream.id);
+    });
+
+    uploadStream.end(buffer);
+  });
+};
+
+/**
+ * Obtém um arquivo do GridFS por ID (bucket de formulários)
  * @param {ObjectId|string} fileId - ID do arquivo
  * @returns {Promise<{stream: ReadableStream, file: object}>}
  */
 const getFromGridFS = async (fileId) => {
-  const bucket = getBucket();
+  const bucket = getFormulariosBucket();
   const _id = new mongoose.Types.ObjectId(fileId);
   
   // Busca informações do arquivo
@@ -85,31 +143,80 @@ const getFromGridFS = async (fileId) => {
 };
 
 /**
- * Lista todos os arquivos do GridFS
+ * Obtém um arquivo do GridFS por ID (bucket de arquivos de produtos)
+ * @param {ObjectId|string} fileId - ID do arquivo
+ * @returns {Promise<{stream: ReadableStream, file: object}>}
+ */
+const getFromProductFilesGridFS = async (fileId) => {
+  const bucket = getProductFilesBucket();
+  const _id = new mongoose.Types.ObjectId(fileId);
+  
+  // Busca informações do arquivo
+  const files = await bucket.find({ _id }).toArray();
+  
+  if (files.length === 0) {
+    throw new Error('Arquivo não encontrado');
+  }
+
+  const file = files[0];
+  const stream = bucket.openDownloadStream(_id);
+  
+  return { stream, file };
+};
+
+/**
+ * Lista todos os arquivos do GridFS (bucket de formulários)
  * @returns {Promise<Array>}
  */
 const listFiles = async () => {
-  const bucket = getBucket();
+  const bucket = getFormulariosBucket();
   const files = await bucket.find({}).sort({ uploadDate: -1 }).toArray();
   return files;
 };
 
 /**
- * Deleta um arquivo do GridFS
+ * Lista todos os arquivos do GridFS (bucket de arquivos de produtos)
+ * @returns {Promise<Array>}
+ */
+const listProductFiles = async () => {
+  const bucket = getProductFilesBucket();
+  const files = await bucket.find({}).sort({ uploadDate: -1 }).toArray();
+  return files;
+};
+
+/**
+ * Deleta um arquivo do GridFS (bucket de formulários)
  * @param {ObjectId|string} fileId - ID do arquivo
  */
 const deleteFromGridFS = async (fileId) => {
-  const bucket = getBucket();
+  const bucket = getFormulariosBucket();
   const _id = new mongoose.Types.ObjectId(fileId);
   await bucket.delete(_id);
-  console.log(`🗑️ Arquivo deletado do GridFS: ${fileId}`);
+  console.log(`🗑️ Arquivo deletado do GridFS (formularios): ${fileId}`);
+};
+
+/**
+ * Deleta um arquivo do GridFS (bucket de arquivos de produtos)
+ * @param {ObjectId|string} fileId - ID do arquivo
+ */
+const deleteFromProductFilesGridFS = async (fileId) => {
+  const bucket = getProductFilesBucket();
+  const _id = new mongoose.Types.ObjectId(fileId);
+  await bucket.delete(_id);
+  console.log(`🗑️ Arquivo deletado do GridFS (product_files): ${fileId}`);
 };
 
 export {
   initGridFS,
   getBucket,
+  getFormulariosBucket,
+  getProductFilesBucket,
   saveToGridFS,
+  saveToProductFilesGridFS,
   getFromGridFS,
+  getFromProductFilesGridFS,
   listFiles,
+  listProductFiles,
   deleteFromGridFS,
+  deleteFromProductFilesGridFS,
 };

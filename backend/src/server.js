@@ -7,16 +7,20 @@ import path from "path"
 import { fileURLToPath } from "url"
 
 // Import GridFS
-import { initGridFS } from './gridfs/gridfsStorage.js';
+import { initGridFS, getFromProductFilesGridFS } from './gridfs/gridfsStorage.js';
 
 // Import controllers
 import productController from './controllers/productController.js';
 import movementController from './controllers/movementController.js';
 
+// Import services
+import productService from './services/productService.js';
+
 // Import routes
 import reportRoutes from './routes/reportRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import fileRoutes from './routes/fileRoutes.js';
+import productFileRoutes from './routes/productFileRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -61,14 +65,57 @@ app.get('/api/produtos', productController.getProducts);
 app.get('/api/produtos/next-code', productController.getNextCode);
 app.get('/api/produtos/:id', productController.getProduct);
 app.post('/api/produtos', productController.createProduct);
-app.put('/api/produtos/:id', productController.updateProduct);
+app.put('/api/produtos/:id', upload.single('nota_fiscal'), productController.updateProduct);
 app.delete('/api/produtos/:id', productController.deleteProduct);
+
+// =====================================
+// 📄 Rotas de Nota Fiscal (Visualizar/Baixar) - Usando bucket product_files
+// =====================================
+app.get('/api/produtos/:id/nota-fiscal/view', async (req, res) => {
+  try {
+    const product = await productService.getProductById(req.params.id);
+    if (!product || !product.nota_fiscal_id) {
+      return res.status(404).json({ error: 'Nota fiscal não encontrada' });
+    }
+    
+    const { stream, file } = await getFromProductFilesGridFS(product.nota_fiscal_id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="' + file.filename + '"');
+    stream.pipe(res);
+  } catch (error) {
+    console.error('Erro ao visualizar nota fiscal:', error);
+    res.status(500).json({ error: 'Erro ao visualizar nota fiscal' });
+  }
+});
+
+app.get('/api/produtos/:id/nota-fiscal/download', async (req, res) => {
+  try {
+    const product = await productService.getProductById(req.params.id);
+    if (!product || !product.nota_fiscal_id) {
+      return res.status(404).json({ error: 'Nota fiscal não encontrada' });
+    }
+    
+    const { stream, file } = await getFromProductFilesGridFS(product.nota_fiscal_id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${product.nota_fiscal_filename || file.filename}"`);
+    res.setHeader('Content-Length', file.length);
+    stream.pipe(res);
+  } catch (error) {
+    console.error('Erro ao baixar nota fiscal:', error);
+    res.status(500).json({ error: 'Erro ao baixar nota fiscal' });
+  }
+});
+
+// =====================================
+// 📦 Rotas de Arquivos de Produtos (GridFS - product_files)
+// =====================================
+app.use('/api/product-files', productFileRoutes);
 
 // =====================================
 // 🟠 Rotas de Movimentações
 // =====================================
 app.get('/api/movimentacoes', movementController.getMovements);
-app.post('/api/entrada', movementController.createEntry);
+app.post('/api/entrada', upload.single('nota_fiscal'), movementController.createEntry);
 app.post('/api/saida', movementController.createExit);
 
 // =====================================
@@ -90,4 +137,4 @@ app.use('/api/dashboard', dashboardRoutes);
 // 🚀 Servidor
 // =====================================
 const PORT = 3000
-app.listen(PORT, () => console.log(`🚀 Servidor rodando em http://localhost:${PORT}`))
+app.listen(PORT, () => console.log(`� Servidor rodando em http://localhost:${PORT}`))

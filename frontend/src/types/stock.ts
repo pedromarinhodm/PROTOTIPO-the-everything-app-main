@@ -9,6 +9,8 @@ export interface Product {
   fornecedor?: string;
   numero_processo?: string;
   observacoes?: string;
+  nota_fiscal_id?: string;
+  nota_fiscal_filename?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -33,23 +33,21 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Search, Pencil, Trash2, Package, FileText, Eye, Download } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Package, FileText, Eye, Download, X, FileUp } from "lucide-react";
 import { toast } from "sonner";
 
 type ProductFormData = {
   descricao: string;
-  quantidade: string;
   unidade: string;
   descricao_complementar: string;
   validade: string;
   fornecedor: string;
   numero_processo: string;
   observacoes: string;
-  nota_fiscal?: File;
-  imagens?: FileList;
+  nota_fiscal?: File | null;
 };
 
-const ProductForm = ({ formData, setFormData, isEdit = false }: { formData: ProductFormData; setFormData: React.Dispatch<React.SetStateAction<ProductFormData>>; isEdit?: boolean }) => (
+const ProductForm = ({ formData, setFormData, isEdit = false, currentQuantity = 0 }: { formData: ProductFormData; setFormData: React.Dispatch<React.SetStateAction<ProductFormData>>; isEdit?: boolean; currentQuantity?: number }) => (
   <div className="grid gap-4 py-4">
     <div className="grid grid-cols-2 gap-4">
       <div className="space-y-2">
@@ -62,15 +60,15 @@ const ProductForm = ({ formData, setFormData, isEdit = false }: { formData: Prod
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="quantidade">Quantidade *</Label>
+        <Label htmlFor="quantidade">Quantidade em Estoque</Label>
         <Input
           id="quantidade"
           type="number"
-          value={formData.quantidade}
-          onChange={(e) => setFormData({ ...formData, quantidade: e.target.value })}
-          placeholder="0"
-          min="0"
+          value={currentQuantity}
+          disabled
+          className="bg-muted"
         />
+        <p className="text-xs text-muted-foreground">Calculada automaticamente das movimentações</p>
       </div>
     </div>
 
@@ -152,16 +150,18 @@ export default function Products() {
 
 
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ProductFormData>({
     descricao: "",
-    quantidade: "",
     unidade: "UN",
     descricao_complementar: "",
     validade: "",
     fornecedor: "",
     numero_processo: "",
     observacoes: "",
+    nota_fiscal: null,
   });
+
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
 
   // Load products on component mount
   useEffect(() => {
@@ -188,17 +188,22 @@ export default function Products() {
     product.codigo.toString().includes(searchQuery)
   );
 
+  // Calculate total stock and 30% threshold for low stock alert
+  const totalStock = products.reduce((sum, p) => sum + (p.quantidade || 0), 0);
+  const lowStockThreshold = totalStock * 0.30;
+
   const resetForm = () => {
     setFormData({
       descricao: "",
-      quantidade: "",
       unidade: "UN",
       descricao_complementar: "",
       validade: "",
       fornecedor: "",
       numero_processo: "",
       observacoes: "",
+      nota_fiscal: null,
     });
+    setInvoiceFile(null);
   };
 
 
@@ -209,24 +214,52 @@ export default function Products() {
     }
 
     try {
-      const result = await api.products.update(editingProduct._id, {
-        descricao: formData.descricao,
-        quantidade: parseInt(formData.quantidade) || editingProduct.quantidade,
-        unidade: formData.unidade,
-        descricao_complementar: formData.descricao_complementar || undefined,
-        validade: formData.validade || undefined,
-        fornecedor: formData.fornecedor || undefined,
-        numero_processo: formData.numero_processo || undefined,
-        observacoes: formData.observacoes || undefined,
-      });
+      let updatedProduct: Product;
+      
+      // Se há arquivo de nota fiscal, usa FormData
+      if (invoiceFile) {
+        const formDataToSend = new FormData();
+        formDataToSend.append('descricao', formData.descricao);
+        formDataToSend.append('unidade', formData.unidade);
+        if (formData.descricao_complementar) formDataToSend.append('descricao_complementar', formData.descricao_complementar);
+        if (formData.validade) formDataToSend.append('validade', formData.validade);
+        if (formData.fornecedor) formDataToSend.append('fornecedor', formData.fornecedor);
+        if (formData.numero_processo) formDataToSend.append('numero_processo', formData.numero_processo);
+        if (formData.observacoes) formDataToSend.append('observacoes', formData.observacoes);
+        formDataToSend.append('nota_fiscal', invoiceFile);
 
-      setProducts(prev => prev.map(p => p._id === editingProduct._id ? result.produto : p));
+        console.log('Enviando formulário com nota fiscal...');
+        const result = await api.products.updateWithInvoice(editingProduct._id, formDataToSend);
+        console.log('Resposta do servidor:', result);
+        
+        if (!result || !result.data) {
+          throw new Error('Resposta inválida do servidor');
+        }
+        updatedProduct = result.data;
+      } else {
+        // Atualização sem arquivo
+        const result = await api.products.update(editingProduct._id, {
+          descricao: formData.descricao,
+          unidade: formData.unidade,
+          descricao_complementar: formData.descricao_complementar || undefined,
+          validade: formData.validade || undefined,
+          fornecedor: formData.fornecedor || undefined,
+          numero_processo: formData.numero_processo || undefined,
+          observacoes: formData.observacoes || undefined,
+        });
+        updatedProduct = result.produto;
+      }
+
+      console.log('Produto atualizado:', updatedProduct);
+      setProducts(prev => prev.map(p => p._id === editingProduct._id ? updatedProduct : p));
+      
       toast.success("Produto atualizado com sucesso!");
       setIsEditDialogOpen(false);
       setEditingProduct(null);
       resetForm();
     } catch (error) {
-      toast.error("Erro ao atualizar produto");
+      console.error('Erro ao atualizar produto:', error);
+      toast.error("Erro ao atualizar produto: " + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   };
 
@@ -247,15 +280,54 @@ export default function Products() {
     setEditingProduct(product);
     setFormData({
       descricao: product.descricao,
-      quantidade: String(product.quantidade),
       unidade: product.unidade,
       descricao_complementar: product.descricao_complementar || "",
       validade: product.validade || "",
       fornecedor: product.fornecedor || "",
       numero_processo: product.numero_processo || "",
       observacoes: product.observacoes || "",
+      nota_fiscal: null,
     });
+    setInvoiceFile(null);
     setIsEditDialogOpen(true);
+  };
+
+  const handleViewInvoice = (product: Product) => {
+    if (product.nota_fiscal_id) {
+      window.open(api.products.getInvoiceViewUrl(product._id), '_blank');
+    }
+  };
+
+  const handleDownloadInvoice = async (product: Product) => {
+    if (product.nota_fiscal_id) {
+      try {
+        const response = await fetch(api.products.getInvoiceDownloadUrl(product._id));
+        if (!response.ok) throw new Error('Erro ao baixar nota fiscal');
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = product.nota_fiscal_filename || 'nota-fiscal.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success("Nota fiscal baixada com sucesso!");
+      } catch (error) {
+        toast.error("Erro ao baixar nota fiscal");
+      }
+    }
+  };
+
+  const handleRemoveInvoice = () => {
+    setInvoiceFile(null);
+    if (editingProduct) {
+      setEditingProduct({
+        ...editingProduct,
+        nota_fiscal_id: undefined,
+        nota_fiscal_filename: undefined,
+      });
+    }
   };
 
   const openDetailsDialog = (product: Product) => {
@@ -331,7 +403,7 @@ export default function Products() {
                       <TableCell className="text-center align-middle">
                         <span
                           className={
-                            product.quantidade <= 5
+                            product.quantidade <= lowStockThreshold
                               ? "text-red-500 font-semibold"
                               : "text-green-500 font-semibold"
                           }
@@ -389,14 +461,110 @@ export default function Products() {
           resetForm();
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Produto</DialogTitle>
-            <DialogDescription>
-              Código: {editingProduct?.codigo}
-            </DialogDescription>
-          </DialogHeader>
-          <ProductForm formData={formData} setFormData={setFormData} isEdit />
+          <DialogDescription>
+            Código: {editingProduct?.codigo}
+          </DialogDescription>
+        </DialogHeader>
+        <ProductForm formData={formData} setFormData={setFormData} isEdit currentQuantity={editingProduct?.quantidade || 0} />
+
+          
+          {/* Seção de Nota Fiscal */}
+          <div className="border-t pt-4 mt-4">
+            <Label className="text-base font-semibold mb-3 block">Nota Fiscal (PDF)</Label>
+            
+            {/* Nota Fiscal Existente */}
+            {editingProduct?.nota_fiscal_id && !invoiceFile && (
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg mb-3">
+                <FileText className="h-5 w-5 text-blue-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {editingProduct.nota_fiscal_filename || 'Nota fiscal anexada'}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleViewInvoice(editingProduct)}
+                    title="Visualizar"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDownloadInvoice(editingProduct)}
+                    title="Baixar"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveInvoice}
+                    title="Remover"
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Upload de Nova Nota Fiscal */}
+            <div className="space-y-2">
+              <Input
+                type="file"
+                accept=".pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (file.type !== 'application/pdf') {
+                      toast.error('Apenas arquivos PDF são permitidos');
+                      return;
+                    }
+                    setInvoiceFile(file);
+                  }
+                }}
+                className="hidden"
+                id="nota-fiscal-upload"
+              />
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => document.getElementById('nota-fiscal-upload')?.click()}
+                  className="w-full"
+                >
+                  <FileUp className="mr-2 h-4 w-4" />
+                  {invoiceFile ? 'Trocar arquivo' : (editingProduct?.nota_fiscal_id ? 'Substituir nota fiscal' : 'Anexar nota fiscal')}
+                </Button>
+              </div>
+              
+              {/* Preview do arquivo selecionado */}
+              {invoiceFile && (
+                <div className="flex items-center gap-2 p-2 bg-blue-50 rounded text-sm">
+                  <FileText className="h-4 w-4 text-blue-500" />
+                  <span className="flex-1 truncate">{invoiceFile.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setInvoiceFile(null)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              
+              <p className="text-xs text-muted-foreground">
+                Formatos aceitos: PDF (máx. 10MB)
+              </p>
+            </div>
+          </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar

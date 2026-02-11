@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowDownToLine, CheckCircle2 } from "lucide-react";
+import { ArrowDownToLine, CheckCircle2, FileText, X, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { api } from "@/services/api";
@@ -16,21 +16,25 @@ export default function Entries() {
   const [formData, setFormData] = useState({
     produto: "",
     quantidade: "",
+    unidade: "UN",
     observacoes: "",
     servidor_almoxarifado: "",
     data_entrada: format(new Date(), "yyyy-MM-dd"),
   });
 
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
     setFormData({
       produto: "",
       quantidade: "",
+      unidade: "UN",
       observacoes: "",
       servidor_almoxarifado: "",
       data_entrada: format(new Date(), "yyyy-MM-dd"),
     });
+    setInvoiceFile(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,13 +60,29 @@ export default function Entries() {
     setIsSubmitting(true);
 
     try {
-      await api.movements.createEntry({
-        descricao: formData.produto.trim(),
-        quantidade: parseInt(formData.quantidade),
-        unidade: "unidade", // Default unit
-        servidor_almoxarifado: formData.servidor_almoxarifado.trim(),
-        data_entrada: formData.data_entrada,
-      });
+      // Se há nota fiscal, usa FormData
+      if (invoiceFile) {
+        const formDataToSend = new FormData();
+        formDataToSend.append('produto', formData.produto.trim());
+        formDataToSend.append('quantidade', formData.quantidade);
+        formDataToSend.append('unidade', formData.unidade);
+        formDataToSend.append('servidor_almoxarifado', formData.servidor_almoxarifado.trim());
+        formDataToSend.append('data', formData.data_entrada);
+        if (formData.observacoes) formDataToSend.append('observacoes', formData.observacoes);
+        formDataToSend.append('nota_fiscal', invoiceFile);
+
+        await api.movements.createEntryWithInvoice(formDataToSend);
+      } else {
+        // Entrada sem nota fiscal
+        await api.movements.createEntry({
+          produto: formData.produto.trim(),
+          quantidade: parseInt(formData.quantidade, 10),
+          unidade: formData.unidade,
+          servidor_almoxarifado: formData.servidor_almoxarifado.trim(),
+          data: formData.data_entrada,
+          ...(formData.observacoes ? { observacoes: formData.observacoes } : {}),
+        });
+      }
 
       toast.success(
         <div className="flex items-center gap-2">
@@ -133,6 +153,70 @@ export default function Entries() {
                       placeholder="0"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unidade">Unidade</Label>
+                    <Input
+                      id="unidade"
+                      value={formData.unidade}
+                      onChange={(e) =>
+                        setFormData({ ...formData, unidade: e.target.value })
+                      }
+                      placeholder="UN, CX, KG..."
+                    />
+                  </div>
+                </div>
+                
+                {/* Nota Fiscal Upload */}
+                <div className="space-y-2 pt-2">
+                  <Label htmlFor="nota-fiscal">Nota Fiscal (PDF)</Label>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.type !== 'application/pdf') {
+                          toast.error('Apenas arquivos PDF são permitidos');
+                          return;
+                        }
+                        setInvoiceFile(file);
+                      }
+                    }}
+                    className="hidden"
+                    id="nota-fiscal-upload"
+                  />
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('nota-fiscal-upload')?.click()}
+                      className="w-full sm:w-auto"
+                    >
+                      <FileUp className="mr-2 h-4 w-4" />
+                      {invoiceFile ? 'Trocar arquivo' : 'Anexar nota fiscal'}
+                    </Button>
+                  </div>
+                  
+                  {/* Preview do arquivo selecionado */}
+                  {invoiceFile && (
+                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded text-sm">
+                      <FileText className="h-4 w-4 text-blue-500" />
+                      <span className="flex-1 truncate">{invoiceFile.name}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setInvoiceFile(null)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                  
+                  <p className="text-xs text-muted-foreground">
+                    Formatos aceitos: PDF (máx. 10MB). A nota fiscal será vinculada ao produto.
+                  </p>
                 </div>
               </div>
 

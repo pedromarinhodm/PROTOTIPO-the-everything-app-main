@@ -4,6 +4,7 @@
  */
 
 import movementService from '../services/movementService.js';
+import { saveToProductFilesGridFS } from '../gridfs/gridfsStorage.js';
 
 /**
  * GET /api/movements
@@ -36,11 +37,34 @@ const getMovements = async (req, res) => {
 
 /**
  * POST /api/movements/entry
- * Registra uma entrada de estoque
+ * Registra uma entrada de estoque (com suporte a nota fiscal)
  */
 const createEntry = async (req, res) => {
   try {
     const entryData = req.body;
+    
+    // Se há arquivo de nota fiscal, processa o upload
+    if (req.file) {
+      // Valida tipo do arquivo (apenas PDF)
+      if (req.file.mimetype !== 'application/pdf') {
+        return res.status(400).json({
+          success: false,
+          error: 'Apenas arquivos PDF são permitidos para nota fiscal',
+        });
+      }
+
+      // Salva nota fiscal no GridFS (bucket product_files)
+      const filename = Date.now() + '-' + req.file.originalname;
+      const fileId = await saveToProductFilesGridFS(req.file.buffer, filename, {
+        tipo: 'nota_fiscal',
+        uploadDate: new Date(),
+      });
+
+      // Adiciona referência da nota fiscal aos dados da entrada
+      entryData.nota_fiscal_id = fileId.toString();
+      entryData.nota_fiscal_filename = req.file.originalname;
+    }
+
     const movement = await movementService.createEntry(entryData);
 
     res.status(201).json({

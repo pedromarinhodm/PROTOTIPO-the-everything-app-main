@@ -11,7 +11,23 @@ import productService from './productService.js';
  * Registra uma entrada de estoque
  */
 const createEntry = async (entryData) => {
-  const { produto, quantidade, data, servidor_almoxarifado, observacoes } = entryData;
+  const produto = entryData.produto ?? entryData.descricao;
+  const quantidade = Number(entryData.quantidade);
+  const data = entryData.data ?? entryData.data_entrada;
+  const servidor_almoxarifado = entryData.servidor_almoxarifado;
+  const observacoes = entryData.observacoes;
+  const nota_fiscal_id = entryData.nota_fiscal_id;
+  const nota_fiscal_filename = entryData.nota_fiscal_filename;
+
+  if (!produto || !String(produto).trim()) {
+    throw new Error('Descrição do produto é obrigatória');
+  }
+  if (!Number.isFinite(quantidade) || quantidade <= 0) {
+    throw new Error('Quantidade inválida');
+  }
+  if (!servidor_almoxarifado || !String(servidor_almoxarifado).trim()) {
+    throw new Error('Servidor do almoxarifado é obrigatório');
+  }
 
   // Procura produto existente pela descrição
   let existingProduct = await Product.findOne({
@@ -19,23 +35,41 @@ const createEntry = async (entryData) => {
   });
 
   if (existingProduct) {
-    // Incrementa quantidade do produto existente
-    existingProduct.quantidade += quantidade;
-    await existingProduct.save();
+    // Se há nota fiscal, atualiza o produto
+    if (nota_fiscal_id) {
+      existingProduct.nota_fiscal_id = nota_fiscal_id;
+      existingProduct.nota_fiscal_filename = nota_fiscal_filename;
+      await existingProduct.save();
+    }
   } else {
-    // Cria novo produto
-    existingProduct = await productService.createProduct({
+    // Cria novo produto com nota fiscal se fornecida
+    const productData = {
       descricao: produto,
       quantidade,
-    });
+    };
+    
+    if (nota_fiscal_id) {
+      productData.nota_fiscal_id = nota_fiscal_id;
+      productData.nota_fiscal_filename = nota_fiscal_filename;
+    }
+    
+    existingProduct = await productService.createProduct(productData);
   }
 
   // Cria registro de movimentação
+  // Converte string de data para Date (adiciona T12:00:00 para evitar problema de fuso)
+  let movementDate = data;
+  if (typeof data === 'string' && data.length === 10) {
+    movementDate = new Date(data + 'T12:00:00');
+  } else if (!data) {
+    movementDate = new Date();
+  }
+
   const movement = new Movement({
     produto_id: existingProduct._id,
     tipo: 'entrada',
     quantidade,
-    data: data || new Date(),
+    data: movementDate,
     servidor_almoxarifado: servidor_almoxarifado || 'Sistema',
   });
 
@@ -55,21 +89,28 @@ const createExit = async (exitData) => {
     throw new Error('Produto não encontrado');
   }
 
-  // Verifica estoque disponível
-  if (produto.quantidade < quantidade) {
+  // Verifica estoque disponível calculando dinamicamente
+  const productService = await import('./productService.js');
+  const currentQuantity = await productService.default.calculateProductQuantity(produto_id);
+  
+  if (currentQuantity < quantidade) {
     throw new Error('Estoque insuficiente');
   }
 
-  // Atualiza quantidade
-  produto.quantidade -= quantidade;
-  await produto.save();
-
   // Cria registro de movimentação
+  // Converte string de data para Date (adiciona T12:00:00 para evitar problema de fuso)
+  let movementDate = data;
+  if (typeof data === 'string' && data.length === 10) {
+    movementDate = new Date(data + 'T12:00:00');
+  } else if (!data) {
+    movementDate = new Date();
+  }
+
   const movement = new Movement({
     produto_id,
     tipo: 'saida',
     quantidade,
-    data: data || new Date(),
+    data: movementDate,
     servidor_almoxarifado,
     setor_responsavel,
     servidor_retirada,
@@ -134,9 +175,16 @@ const getMovements = async (filters = {}) => {
     });
   }
 
-  // Ordenação
+  // Ordenação: primeiro por data (sem horário), depois por createdAt
+  // Usando $dateTrunc para ignorar o horário na ordenação
   pipeline.push({
-    $sort: { data: -1, createdAt: -1 }
+    $addFields: {
+      dataDia: { $dateTrunc: { date: "$data", unit: "day" } }
+    }
+  });
+  
+  pipeline.push({
+    $sort: { dataDia: -1, createdAt: -1 }
   });
 
   // Limitação se especificada

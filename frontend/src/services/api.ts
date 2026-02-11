@@ -53,6 +53,20 @@ class ApiService {
       this.request(`/produtos/${id}`, {
         method: 'DELETE',
       }),
+
+    updateWithInvoice: (id: string, formData: FormData): Promise<{ success: boolean; data: Product; message?: string }> => {
+      return fetch(`${API_BASE_URL}/produtos/${id}`, {
+        method: 'PUT',
+        body: formData,
+      }).then(res => {
+        if (!res.ok) throw new Error(`Update failed: ${res.statusText}`);
+        return res.json();
+      });
+    },
+
+    getInvoiceViewUrl: (id: string): string => `${API_BASE_URL}/produtos/${id}/nota-fiscal/view`,
+
+    getInvoiceDownloadUrl: (id: string): string => `${API_BASE_URL}/produtos/${id}/nota-fiscal/download`,
   };
 
   // Movements
@@ -69,16 +83,27 @@ class ApiService {
     },
 
     createEntry: (entry: {
-      descricao: string;
+      produto: string;
       quantidade: number;
       unidade?: string;
       servidor_almoxarifado: string;
-      data_entrada?: string;
+      data?: string;
+      observacoes?: string;
     }): Promise<{ success: boolean; message: string }> =>
       this.request('/entrada', {
         method: 'POST',
         body: JSON.stringify(entry),
       }),
+
+    createEntryWithInvoice: (formData: FormData): Promise<{ success: boolean; data: Movement; message: string }> => {
+      return fetch(`${API_BASE_URL}/entrada`, {
+        method: 'POST',
+        body: formData,
+      }).then(res => {
+        if (!res.ok) throw new Error(`Entry failed: ${res.statusText}`);
+        return res.json();
+      });
+    },
 
     createExit: (exit: {
       produto_id: string;
