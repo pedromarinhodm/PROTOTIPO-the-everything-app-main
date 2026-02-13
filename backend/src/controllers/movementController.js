@@ -12,7 +12,7 @@ import { saveToProductFilesGridFS } from '../gridfs/gridfsStorage.js';
  */
 const getMovements = async (req, res) => {
   try {
-    const { search, tipo, startDate, endDate, limit } = req.query;
+    const { search, tipo, startDate, endDate, limit, productId, setor } = req.query;
 
     const filters = {
       search,
@@ -20,6 +20,8 @@ const getMovements = async (req, res) => {
       startDate,
       endDate,
       limit: limit ? parseInt(limit) : undefined,
+      productId,
+      setor,
     };
 
     const movements = await movementService.getMovements(filters);

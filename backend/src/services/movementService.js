@@ -178,16 +178,32 @@ const getMovements = async (filters = {}) => {
     query = query.eq('produto_id', productId);
   }
 
-  if (setor && setor !== 'todos') {
-    query = query.or(`setor_responsavel.eq.${setor},setor.eq.${setor}`);
+  // Nota: O filtro por setor será aplicado em memória após buscar os dados
+  // para evitar problemas com caracteres especiais na query do Supabase
+
+  // Helper para extrair data no formato YYYY-MM-DD de diferentes formatos de entrada
+  const extractDatePart = (dateString) => {
+    if (!dateString) return null;
+    // Se já estiver no formato YYYY-MM-DD, retorna como está
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+    // Se for ISO format (2026-02-13T03:00:00.000Z), extrai a parte da data
+    if (dateString.includes('T')) {
+      return dateString.split('T')[0];
+    }
+    return dateString;
+  };
+
+  const formattedStartDate = extractDatePart(startDate);
+  const formattedEndDate = extractDatePart(endDate);
+
+  if (formattedStartDate) {
+    query = query.gte('data', `${formattedStartDate}T00:00:00.000Z`);
   }
 
-  if (startDate) {
-    query = query.gte('data', `${startDate}T00:00:00.000Z`);
-  }
-
-  if (endDate) {
-    query = query.lte('data', `${endDate}T23:59:59.999Z`);
+  if (formattedEndDate) {
+    query = query.lte('data', `${formattedEndDate}T23:59:59.999Z`);
   }
 
   if (limit) {
@@ -223,6 +239,13 @@ const getMovements = async (filters = {}) => {
   if (search) {
     const normalizedSearch = search.toLowerCase();
     mapped = mapped.filter((movement) => movement.produto_id.descricao.toLowerCase().includes(normalizedSearch));
+  }
+
+  // Aplicar filtro por setor em memória (após mapear os produtos)
+  if (setor && setor !== 'todos') {
+    mapped = mapped.filter((movement) => 
+      movement.setor_responsavel === setor || movement.setor === setor
+    );
   }
 
   return mapped;
