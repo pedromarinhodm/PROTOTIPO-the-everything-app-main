@@ -1,210 +1,217 @@
-/**
- * GridFS Storage
- * Configuração para armazenamento de arquivos no MongoDB
- */
+import { Readable } from 'stream';
+import { supabase, STORAGE_BUCKETS } from '../db/supabaseClient.js';
 
-import mongoose from 'mongoose';
-import { GridFSBucket } from 'mongodb';
+const FORMULARIOS_TABLE = 'formularios_files';
+const PRODUCT_FILES_TABLE = 'product_files';
 
-let formulariosBucket;
-let productFilesBucket;
-
-/**
- * Inicializa os buckets GridFS
- */
-const initGridFS = () => {
-  const db = mongoose.connection.db;
-  
-  // Bucket para formulários
-  formulariosBucket = new GridFSBucket(db, {
-    bucketName: 'formularios'
-  });
-  
-  // Bucket para arquivos de produtos (notas fiscais)
-  productFilesBucket = new GridFSBucket(db, {
-    bucketName: 'product_files'
-  });
-  
-  console.log('✅ GridFS inicializado (formularios + product_files)');
-  return { formulariosBucket, productFilesBucket };
+const initGridFS = async () => {
+  await ensureBucket(STORAGE_BUCKETS.FORMULARIOS);
+  await ensureBucket(STORAGE_BUCKETS.PRODUCT_FILES);
+  return {
+    formulariosBucket: STORAGE_BUCKETS.FORMULARIOS,
+    productFilesBucket: STORAGE_BUCKETS.PRODUCT_FILES,
+  };
 };
 
-/**
- * Obtém o bucket de formulários
- */
-const getFormulariosBucket = () => {
-  if (!formulariosBucket) {
-    initGridFS();
+const ensureBucket = async (bucket) => {
+  const { data, error } = await supabase.storage.getBucket(bucket);
+
+  if (!error && data) return;
+
+  const { error: createError } = await supabase.storage.createBucket(bucket, {
+    public: false,
+    fileSizeLimit: 10485760,
+    allowedMimeTypes: ['application/pdf'],
+  });
+
+  if (createError && !String(createError.message || '').toLowerCase().includes('already')) {
+    throw createError;
   }
-  return formulariosBucket;
 };
 
-/**
- * Obtém o bucket de arquivos de produtos
- */
-const getProductFilesBucket = () => {
-  if (!productFilesBucket) {
-    initGridFS();
-  }
-  return productFilesBucket;
+const insertFileRow = async (table, values) => {
+  const { data, error } = await supabase
+    .from(table)
+    .insert(values)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
 };
 
-/**
- * Obtém o bucket GridFS (padrão: formularios)
- */
-const getBucket = () => {
-  return getFormulariosBucket();
+const getFileRow = async (table, fileId) => {
+  const { data, error } = await supabase
+    .from(table)
+    .select('*')
+    .eq('id', fileId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error('Arquivo nao encontrado');
+
+  return data;
 };
 
-/**
- * Salva um buffer no GridFS (bucket de formulários)
- * @param {Buffer} buffer - Conteúdo do arquivo
- * @param {string} filename - Nome do arquivo
- * @param {object} metadata - Metadados adicionais
- * @returns {Promise<ObjectId>} - ID do arquivo salvo
- */
-const saveToGridFS = (buffer, filename, metadata = {}) => {
-  return new Promise((resolve, reject) => {
-    const bucket = getFormulariosBucket();
-    
-    const uploadStream = bucket.openUploadStream(filename, {
-      metadata: {
-        ...metadata,
-        uploadDate: new Date(),
-      }
+const uploadToBucket = async (bucket, path, buffer) => {
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(path, buffer, {
+      contentType: 'application/pdf',
+      upsert: true,
     });
 
-    uploadStream.on('error', (error) => {
-      console.error('❌ Erro ao salvar no GridFS:', error);
-      reject(error);
-    });
+  if (error) throw error;
+};
 
-    uploadStream.on('finish', () => {
-      console.log(`✅ Arquivo salvo no GridFS (formularios): ${filename} (ID: ${uploadStream.id})`);
-      resolve(uploadStream.id);
-    });
+const saveToGridFS = async (buffer, filename, metadata = {}) => {
+  await ensureBucket(STORAGE_BUCKETS.FORMULARIOS);
 
-    uploadStream.end(buffer);
+  const row = await insertFileRow(FORMULARIOS_TABLE, {
+    filename,
+    data_inicial: metadata.data_inicial || null,
+    data_final: metadata.data_final || null,
+    content_type: 'application/pdf',
+    size_bytes: buffer.length,
   });
+
+  const storagePath = `${row.id}/${filename}`;
+
+  await uploadToBucket(STORAGE_BUCKETS.FORMULARIOS, storagePath, buffer);
+
+  const { error } = await supabase
+    .from(FORMULARIOS_TABLE)
+    .update({ storage_path: storagePath })
+    .eq('id', row.id);
+
+  if (error) throw error;
+
+  return row.id;
 };
 
-/**
- * Salva um buffer no GridFS (bucket de arquivos de produtos)
- * @param {Buffer} buffer - Conteúdo do arquivo
- * @param {string} filename - Nome do arquivo
- * @param {object} metadata - Metadados adicionais
- * @returns {Promise<ObjectId>} - ID do arquivo salvo
- */
-const saveToProductFilesGridFS = (buffer, filename, metadata = {}) => {
-  return new Promise((resolve, reject) => {
-    const bucket = getProductFilesBucket();
-    
-    const uploadStream = bucket.openUploadStream(filename, {
-      metadata: {
-        ...metadata,
-        uploadDate: new Date(),
-      }
-    });
+const saveToProductFilesGridFS = async (buffer, filename, metadata = {}) => {
+  await ensureBucket(STORAGE_BUCKETS.PRODUCT_FILES);
 
-    uploadStream.on('error', (error) => {
-      console.error('❌ Erro ao salvar no GridFS (product_files):', error);
-      reject(error);
-    });
-
-    uploadStream.on('finish', () => {
-      console.log(`✅ Arquivo salvo no GridFS (product_files): ${filename} (ID: ${uploadStream.id})`);
-      resolve(uploadStream.id);
-    });
-
-    uploadStream.end(buffer);
+  const row = await insertFileRow(PRODUCT_FILES_TABLE, {
+    filename,
+    produto_id: metadata.produto_id || null,
+    tipo: metadata.tipo || 'nota_fiscal',
+    content_type: 'application/pdf',
+    size_bytes: buffer.length,
   });
+
+  const storagePath = `${row.id}/${filename}`;
+
+  await uploadToBucket(STORAGE_BUCKETS.PRODUCT_FILES, storagePath, buffer);
+
+  const { error } = await supabase
+    .from(PRODUCT_FILES_TABLE)
+    .update({ storage_path: storagePath })
+    .eq('id', row.id);
+
+  if (error) throw error;
+
+  return row.id;
 };
 
-/**
- * Obtém um arquivo do GridFS por ID (bucket de formulários)
- * @param {ObjectId|string} fileId - ID do arquivo
- * @returns {Promise<{stream: ReadableStream, file: object}>}
- */
+const buildFileResponse = async (bucket, row) => {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .download(row.storage_path);
+
+  if (error) throw error;
+
+  const buffer = Buffer.from(await data.arrayBuffer());
+
+  return {
+    stream: Readable.from(buffer),
+    file: {
+      _id: row.id,
+      filename: row.filename,
+      length: row.size_bytes,
+      contentType: row.content_type,
+      uploadDate: row.created_at,
+      metadata: {
+        data_inicial: row.data_inicial,
+        data_final: row.data_final,
+        produto_id: row.produto_id,
+        tipo: row.tipo,
+        uploadDate: row.created_at,
+      },
+    },
+  };
+};
+
 const getFromGridFS = async (fileId) => {
-  const bucket = getFormulariosBucket();
-  const _id = new mongoose.Types.ObjectId(fileId);
-  
-  // Busca informações do arquivo
-  const files = await bucket.find({ _id }).toArray();
-  
-  if (files.length === 0) {
-    throw new Error('Arquivo não encontrado');
-  }
-
-  const file = files[0];
-  const stream = bucket.openDownloadStream(_id);
-  
-  return { stream, file };
+  const row = await getFileRow(FORMULARIOS_TABLE, fileId);
+  return buildFileResponse(STORAGE_BUCKETS.FORMULARIOS, row);
 };
 
-/**
- * Obtém um arquivo do GridFS por ID (bucket de arquivos de produtos)
- * @param {ObjectId|string} fileId - ID do arquivo
- * @returns {Promise<{stream: ReadableStream, file: object}>}
- */
 const getFromProductFilesGridFS = async (fileId) => {
-  const bucket = getProductFilesBucket();
-  const _id = new mongoose.Types.ObjectId(fileId);
-  
-  // Busca informações do arquivo
-  const files = await bucket.find({ _id }).toArray();
-  
-  if (files.length === 0) {
-    throw new Error('Arquivo não encontrado');
+  const row = await getFileRow(PRODUCT_FILES_TABLE, fileId);
+  return buildFileResponse(STORAGE_BUCKETS.PRODUCT_FILES, row);
+};
+
+const listFiles = async () => {
+  const { data, error } = await supabase
+    .from(FORMULARIOS_TABLE)
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((row) => ({
+    _id: row.id,
+    filename: row.filename,
+    uploadDate: row.created_at,
+    metadata: {
+      data_inicial: row.data_inicial,
+      data_final: row.data_final,
+      uploadDate: row.created_at,
+    },
+  }));
+};
+
+const listProductFiles = async () => {
+  const { data, error } = await supabase
+    .from(PRODUCT_FILES_TABLE)
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+};
+
+const deleteFileById = async (table, bucket, fileId) => {
+  const row = await getFileRow(table, fileId);
+
+  if (row.storage_path) {
+    const { error: storageError } = await supabase.storage
+      .from(bucket)
+      .remove([row.storage_path]);
+
+    if (storageError) throw storageError;
   }
 
-  const file = files[0];
-  const stream = bucket.openDownloadStream(_id);
-  
-  return { stream, file };
+  const { error: dbError } = await supabase
+    .from(table)
+    .delete()
+    .eq('id', fileId);
+
+  if (dbError) throw dbError;
 };
 
-/**
- * Lista todos os arquivos do GridFS (bucket de formulários)
- * @returns {Promise<Array>}
- */
-const listFiles = async () => {
-  const bucket = getFormulariosBucket();
-  const files = await bucket.find({}).sort({ uploadDate: -1 }).toArray();
-  return files;
-};
-
-/**
- * Lista todos os arquivos do GridFS (bucket de arquivos de produtos)
- * @returns {Promise<Array>}
- */
-const listProductFiles = async () => {
-  const bucket = getProductFilesBucket();
-  const files = await bucket.find({}).sort({ uploadDate: -1 }).toArray();
-  return files;
-};
-
-/**
- * Deleta um arquivo do GridFS (bucket de formulários)
- * @param {ObjectId|string} fileId - ID do arquivo
- */
 const deleteFromGridFS = async (fileId) => {
-  const bucket = getFormulariosBucket();
-  const _id = new mongoose.Types.ObjectId(fileId);
-  await bucket.delete(_id);
-  console.log(`🗑️ Arquivo deletado do GridFS (formularios): ${fileId}`);
+  await deleteFileById(FORMULARIOS_TABLE, STORAGE_BUCKETS.FORMULARIOS, fileId);
 };
 
-/**
- * Deleta um arquivo do GridFS (bucket de arquivos de produtos)
- * @param {ObjectId|string} fileId - ID do arquivo
- */
 const deleteFromProductFilesGridFS = async (fileId) => {
-  const bucket = getProductFilesBucket();
-  const _id = new mongoose.Types.ObjectId(fileId);
-  await bucket.delete(_id);
-  console.log(`🗑️ Arquivo deletado do GridFS (product_files): ${fileId}`);
+  await deleteFileById(PRODUCT_FILES_TABLE, STORAGE_BUCKETS.PRODUCT_FILES, fileId);
 };
+
+const getBucket = () => STORAGE_BUCKETS.FORMULARIOS;
+const getFormulariosBucket = () => STORAGE_BUCKETS.FORMULARIOS;
+const getProductFilesBucket = () => STORAGE_BUCKETS.PRODUCT_FILES;
 
 export {
   initGridFS,

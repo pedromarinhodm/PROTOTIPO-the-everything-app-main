@@ -5,97 +5,60 @@ Backend do Sistema de Controle e Gerenciamento de Estoque.
 ## Requisitos
 
 - Node.js 18+
-- MongoDB 7.0+
+- Projeto Supabase ativo
+- MongoDB local (apenas para migracao inicial)
 
-## Instalação
+## Instalacao
 
 ```bash
 npm install
 ```
 
-## Configuração
-
-Edite o arquivo `.env`:
+## Configuracao (.env)
 
 ```env
-MONGODB_URI=mongodb://127.0.0.1:27017/scges
-PORT=3001
-NODE_ENV=development
+PORT=3000
+
+# Origem (legado) para migracao
+MONGODB_URI=mongodb://127.0.0.1:27017/controle_estoque
+
+# Destino (Supabase)
+SUPABASE_URL=https://SEU-PROJETO.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=SEU_SERVICE_ROLE_KEY
+
+# Opcional: conexao direta Postgres (SQL/psql)
+DATABASE_URL=postgresql://postgres:SENHA@db.PROJETO.supabase.co:5432/postgres
 ```
 
-## Execução
+## Banco Supabase
+
+1. Execute `backend/supabase/schema.sql` no SQL Editor do Supabase.
+2. Garanta os buckets privados:
+- `formularios`
+- `product-files`
+
+## Migracao de dados MongoDB -> Supabase
+
+```bash
+npm run migrate:supabase
+```
+
+Migracao inclui:
+- Produtos (`produtos` -> `products`)
+- Movimentacoes (`movimentacaos` -> `movements`)
+- PDFs de formularios (GridFS `formularios` -> Supabase Storage `formularios`)
+- PDFs de notas fiscais (GridFS `product_files` -> Supabase Storage `product-files`)
+
+## Execucao
 
 ### Desenvolvimento
+
 ```bash
 npm run dev
 ```
 
-### Produção
+### Producao
+
 ```bash
 npm start
 ```
-
-## Estrutura
-
-```
-src/
-├── controllers/      # Controladores REST
-│   ├── productController.js
-│   ├── movementController.js
-│   ├── reportController.js
-│   ├── fileController.js
-│   └── dashboardController.js
-│
-├── models/           # Modelos Mongoose
-│   ├── Product.js
-│   └── Movement.js
-│
-├── routes/           # Rotas da API
-│   ├── productRoutes.js
-│   ├── movementRoutes.js
-│   ├── reportRoutes.js
-│   ├── fileRoutes.js
-│   └── dashboardRoutes.js
-│
-├── services/         # Lógica de negócio
-│   ├── productService.js
-│   ├── movementService.js
-│   └── reportService.js
-│
-├── db/               # Conexão com banco
-│   └── connection.js
-│
-├── gridfs/           # Armazenamento GridFS
-│   └── gridfsStorage.js
-│
-└── server.js         # Ponto de entrada
-```
-
-## API Endpoints
-
-### Produtos
-- `GET /api/products` - Lista todos
-- `GET /api/products/:id` - Obtém por ID
-- `POST /api/products` - Cria novo
-- `PUT /api/products/:id` - Atualiza
-- `DELETE /api/products/:id` - Remove
-
-### Movimentações
-- `GET /api/movements` - Lista com filtros
-- `POST /api/movements/entry` - Registra entrada
-- `POST /api/movements/exit` - Registra saída
-
-### Relatórios
-- `GET /api/reports/estoque/pdf` - PDF de estoque
-- `GET /api/reports/historico/pdf` - PDF de histórico
-- `GET /api/reports/excel` - Excel completo
-
-### Arquivos
-- `GET /api/files` - Lista arquivos
-- `GET /api/files/:id` - Download
-- `DELETE /api/files/:id` - Remove
-
-### Dashboard
-- `GET /api/dashboard/stats` - Estatísticas
-- `GET /api/dashboard/recent-movements` - Recentes
-- `GET /api/dashboard/low-stock` - Estoque baixo

@@ -1,198 +1,201 @@
-/**
- * Service: Product
- * Lógica de negócio para produtos
- */
+import { supabase } from '../db/supabaseClient.js';
 
-import Product from '../models/Product.js';
-import Movement from '../models/Movement.js';
+const parseNumericCode = (codigo) => {
+  const parsed = Number.parseInt(String(codigo ?? ''), 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
-/**
- * Calcula a quantidade atual de um produto baseado nas movimentações
- * @param {string} productId - ID do produto
- * @returns {Promise<number>} - Quantidade calculada (entradas - saídas)
- */
+const mapProductRow = (row, quantity = 0, totalEntries = 0) => ({
+  _id: row.id,
+  codigo: row.codigo,
+  descricao: row.descricao,
+  unidade: row.unidade || '',
+  descricao_complementar: row.descricao_complementar || '',
+  validade: row.validade || '',
+  fornecedor: row.fornecedor || '',
+  numero_processo: row.numero_processo || '',
+  observacoes: row.observacoes || '',
+  nota_fiscal_id: row.nota_fiscal_id || null,
+  nota_fiscal_filename: row.nota_fiscal_filename || null,
+  setor: row.setor || '',
+  quantidade: quantity,
+  totalEntradas: totalEntries,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const getMovementSummaries = async () => {
+  const { data, error } = await supabase
+    .from('movements')
+    .select('produto_id,tipo,quantidade');
+
+  if (error) throw error;
+
+  const summaryByProduct = new Map();
+
+  for (const movement of data || []) {
+    const current = summaryByProduct.get(movement.produto_id) || { entries: 0, exits: 0 };
+
+    if (movement.tipo === 'entrada') {
+      current.entries += Number(movement.quantidade || 0);
+    } else if (movement.tipo === 'saida') {
+      current.exits += Number(movement.quantidade || 0);
+    }
+
+    summaryByProduct.set(movement.produto_id, current);
+  }
+
+  return summaryByProduct;
+};
+
 const calculateProductQuantity = async (productId) => {
-  const movements = await Movement.find({ produto_id: productId });
-  
-  const totalEntries = movements
-    .filter(m => m.tipo === 'entrada')
-    .reduce((sum, m) => sum + m.quantidade, 0);
-    
-  const totalExits = movements
-    .filter(m => m.tipo === 'saida')
-    .reduce((sum, m) => sum + m.quantidade, 0);
-    
-  return totalEntries - totalExits;
+  const summaries = await getMovementSummaries();
+  const summary = summaries.get(productId) || { entries: 0, exits: 0 };
+  return summary.entries - summary.exits;
 };
 
-/**
- * Calcula o total de entradas de um produto
- * @param {string} productId - ID do produto
- * @returns {Promise<number>} - Total de entradas
- */
 const calculateTotalEntries = async (productId) => {
-  const movements = await Movement.find({ produto_id: productId, tipo: 'entrada' });
-  
-  return movements.reduce((sum, m) => sum + m.quantidade, 0);
+  const summaries = await getMovementSummaries();
+  return (summaries.get(productId) || { entries: 0 }).entries;
 };
 
-/**
- * Adiciona quantidade calculada e total de entradas a um produto ou array de produtos
- */
-const addCalculatedQuantity = async (productOrProducts) => {
-  if (Array.isArray(productOrProducts)) {
-    // Processar array de produtos
-    const productsWithQuantity = await Promise.all(
-      productOrProducts.map(async (product) => {
-        const quantity = await calculateProductQuantity(product._id);
-        const totalEntries = await calculateTotalEntries(product._id);
-        return {
-          ...product.toObject(),
-          quantidade: quantity,
-          totalEntradas: totalEntries
-        };
-      })
-    );
-    return productsWithQuantity;
-  } else {
-    // Processar produto único
-    const quantity = await calculateProductQuantity(productOrProducts._id);
-    const totalEntries = await calculateTotalEntries(productOrProducts._id);
-    return {
-      ...productOrProducts.toObject(),
-      quantidade: quantity,
-      totalEntradas: totalEntries
-    };
-  }
-};
-
-/**
- * Gera o próximo código de produto (3 dígitos: 001, 002, etc.)
- */
 const getNextProductCode = async () => {
-  const lastProduct = await Product.findOne({})
-    .sort({ codigo: -1 })
+  const { data, error } = await supabase
+    .from('products')
     .select('codigo');
-  
-  if (!lastProduct || !lastProduct.codigo) {
-    return '001';
-  }
 
-  // Extrai o número do código atual e incrementa
-  const currentCode = parseInt(lastProduct.codigo, 10) || 0;
-  const nextCode = currentCode + 1;
-  
-  // Formata com zero-padding para 3 dígitos
-  return nextCode.toString().padStart(3, '0');
+  if (error) throw error;
+
+  const maxCode = (data || []).reduce((max, row) => Math.max(max, parseNumericCode(row.codigo)), 0);
+  return String(maxCode + 1).padStart(3, '0');
 };
 
-/**
- * Cria um novo produto
- */
 const createProduct = async (productData) => {
   const codigo = await getNextProductCode();
-  
-  const product = new Product({
-    ...productData,
-    codigo,
-  });
 
-  await product.save();
-  return product;
+  const payload = {
+    codigo,
+    descricao: String(productData.descricao || '').trim(),
+    unidade: productData.unidade || '',
+    descricao_complementar: productData.descricao_complementar || '',
+    validade: productData.validade || '',
+    fornecedor: productData.fornecedor || '',
+    numero_processo: productData.numero_processo || '',
+    observacoes: productData.observacoes || '',
+    nota_fiscal_id: productData.nota_fiscal_id || null,
+    nota_fiscal_filename: productData.nota_fiscal_filename || null,
+    setor: productData.setor || '',
+  };
+
+  const { data, error } = await supabase
+    .from('products')
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+
+  return mapProductRow(data, 0, 0);
 };
 
-/**
- * Lista todos os produtos com busca opcional
- */
 const getAllProducts = async (searchQuery = '') => {
-  let query = {};
+  let query = supabase
+    .from('products')
+    .select('*')
+    .order('descricao', { ascending: true });
 
   if (searchQuery) {
-    query = {
-      $or: [
-        { descricao: { $regex: searchQuery, $options: 'i' } },
-        { codigo: { $regex: searchQuery, $options: 'i' } },
-        { fornecedor: { $regex: searchQuery, $options: 'i' } },
-      ],
-    };
+    const escaped = searchQuery.replace(/,/g, ' ');
+    query = query.or(`descricao.ilike.%${escaped}%,codigo.ilike.%${escaped}%,fornecedor.ilike.%${escaped}%`);
   }
 
-  const products = await Product.find(query).sort({ descricao: 1 });
+  const { data: productRows, error } = await query;
+  if (error) throw error;
 
-  // Calcular quantidade para cada produto baseado nas movimentações
-  const productsWithQuantity = await addCalculatedQuantity(products);
+  const summaries = await getMovementSummaries();
 
-  return productsWithQuantity;
+  return (productRows || []).map((row) => {
+    const summary = summaries.get(row.id) || { entries: 0, exits: 0 };
+    return mapProductRow(row, summary.entries - summary.exits, summary.entries);
+  });
 };
 
-/**
- * Obtém um produto por ID
- */
 const getProductById = async (id) => {
-  const product = await Product.findById(id);
-  if (!product) return null;
-  
-  // Calcular quantidade baseada nas movimentações
-  const productWithQuantity = await addCalculatedQuantity(product);
-  return productWithQuantity;
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const summaries = await getMovementSummaries();
+  const summary = summaries.get(data.id) || { entries: 0, exits: 0 };
+
+  return mapProductRow(data, summary.entries - summary.exits, summary.entries);
 };
 
-/**
- * Atualiza um produto
- */
 const updateProduct = async (id, updateData) => {
-  const product = await Product.findByIdAndUpdate(
-    id,
-    { ...updateData },
-    { new: true, runValidators: true }
-  );
-  return product;
-};
+  const payload = {
+    descricao: updateData.descricao,
+    unidade: updateData.unidade,
+    descricao_complementar: updateData.descricao_complementar,
+    validade: updateData.validade,
+    fornecedor: updateData.fornecedor,
+    numero_processo: updateData.numero_processo,
+    observacoes: updateData.observacoes,
+    nota_fiscal_id: updateData.nota_fiscal_id,
+    nota_fiscal_filename: updateData.nota_fiscal_filename,
+    setor: updateData.setor,
+  };
 
-/**
- * Deleta um produto
- */
-const deleteProduct = async (id) => {
-  const product = await Product.findByIdAndDelete(id);
-  return product;
-};
-
-
-/**
- * Obtém estatísticas do estoque
- */
-const getStockStats = async () => {
-  const totalProducts = await Product.countDocuments();
-
-  // Obter todos os produtos com quantidade calculada
-  const allProducts = await Product.find({});
-  const productsWithQuantity = await addCalculatedQuantity(allProducts);
-
-  // Obter a soma total de entradas por produto
-  const entrySums = await Movement.aggregate([
-    { $match: { tipo: 'entrada' } },
-    {
-      $group: {
-        _id: '$produto_id',
-        totalEntries: { $sum: '$quantidade' }
-      }
+  Object.keys(payload).forEach((key) => {
+    if (payload[key] === undefined) {
+      delete payload[key];
     }
-  ]);
-
-  // Criar mapa de produto_id para soma total de entradas
-  const entrySumMap = new Map();
-  entrySums.forEach(sum => {
-    entrySumMap.set(sum._id.toString(), sum.totalEntries);
   });
 
-  // Contar produtos com estoque baixo baseado em 30% da soma total de entradas
-  const lowStockProducts = productsWithQuantity.filter(product => {
-    const totalEntries = entrySumMap.get(product._id.toString()) || 0;
-    const threshold = totalEntries * 0.3; // 30% da soma total de entradas
-    return product.quantidade <= threshold;
+  const { data, error } = await supabase
+    .from('products')
+    .update(payload)
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const totalEntries = await calculateTotalEntries(id);
+  const quantity = await calculateProductQuantity(id);
+
+  return mapProductRow(data, quantity, totalEntries);
+};
+
+const deleteProduct = async (id) => {
+  const existing = await getProductById(id);
+  if (!existing) return null;
+
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+
+  return existing;
+};
+
+const getStockStats = async () => {
+  const products = await getAllProducts();
+  const totalProducts = products.length;
+
+  const lowStockProducts = products.filter((product) => {
+    const threshold = (Number(product.totalEntradas || 0) * 0.3);
+    return Number(product.quantidade || 0) <= threshold;
   }).length;
 
-  const totalStock = productsWithQuantity.reduce((sum, p) => sum + p.quantidade, 0);
+  const totalStock = products.reduce((sum, product) => sum + Number(product.quantidade || 0), 0);
 
   return {
     totalProducts,
@@ -201,49 +204,25 @@ const getStockStats = async () => {
   };
 };
 
-/**
- * Obtém setores únicos dos produtos
- */
 const getUniqueSetores = async () => {
-  const setores = await Product.distinct('setor');
-  return setores.filter(setor => setor && setor.trim() !== '');
+  const { data, error } = await supabase
+    .from('products')
+    .select('setor');
+
+  if (error) throw error;
+
+  return [...new Set((data || []).map((row) => (row.setor || '').trim()).filter(Boolean))];
 };
 
-/**
- * Obtém produtos com estoque baixo
- */
 const getLowStockProducts = async (limit = 10) => {
-  // Primeiro, obter a soma total de entradas por produto
-  const entrySums = await Movement.aggregate([
-    { $match: { tipo: 'entrada' } },
-    {
-      $group: {
-        _id: '$produto_id',
-        totalEntries: { $sum: '$quantidade' }
-      }
-    }
-  ]);
+  const products = await getAllProducts();
 
-  // Criar mapa de produto_id para soma total de entradas
-  const entrySumMap = new Map();
-  entrySums.forEach(sum => {
-    entrySumMap.set(sum._id.toString(), sum.totalEntries);
-  });
-
-  // Obter todos os produtos com quantidade calculada
-  const allProducts = await Product.find({});
-  const productsWithQuantity = await addCalculatedQuantity(allProducts);
-
-  // Filtrar produtos com estoque baixo baseado em 30% da soma total de entradas
-  const lowStockProducts = productsWithQuantity.filter(product => {
-    const totalEntries = entrySumMap.get(product._id.toString()) || 0;
-    const threshold = totalEntries * 0.3; // 30% da soma total de entradas
-    return product.quantidade <= threshold;
-  });
-
-  // Ordenar por quantidade crescente e limitar
-  return lowStockProducts
-    .sort((a, b) => a.quantidade - b.quantidade)
+  return products
+    .filter((product) => {
+      const threshold = (Number(product.totalEntradas || 0) * 0.3);
+      return Number(product.quantidade || 0) <= threshold;
+    })
+    .sort((a, b) => Number(a.quantidade || 0) - Number(b.quantidade || 0))
     .slice(0, limit);
 };
 

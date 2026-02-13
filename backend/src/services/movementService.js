@@ -1,250 +1,262 @@
-/**
- * Service: Movement
- * Lógica de negócio para movimentações
- */
-
-import Movement from '../models/Movement.js';
-import Product from '../models/Product.js';
+import { supabase } from '../db/supabaseClient.js';
 import productService from './productService.js';
 
-/**
- * Registra uma entrada de estoque
- */
+const mapMovementRow = (movement, productRow) => ({
+  _id: movement.id,
+  produto_id: {
+    _id: productRow.id,
+    codigo: productRow.codigo,
+    descricao: productRow.descricao,
+  },
+  tipo: movement.tipo,
+  quantidade: movement.quantidade,
+  data: movement.data,
+  servidor_almoxarifado: movement.servidor_almoxarifado,
+  setor_responsavel: movement.setor_responsavel,
+  servidor_retirada: movement.servidor_retirada,
+  observacoes: movement.observacoes,
+  setor: movement.setor,
+  createdAt: movement.created_at,
+});
+
+const getProductByIdRaw = async (id) => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+};
+
+const getProductByDescription = async (descricao) => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .ilike('descricao', descricao)
+    .limit(1);
+
+  if (error) throw error;
+  return data?.[0] || null;
+};
+
 const createEntry = async (entryData) => {
   const produto = entryData.produto ?? entryData.descricao;
   const quantidade = Number(entryData.quantidade);
   const data = entryData.data ?? entryData.data_entrada;
   const servidor_almoxarifado = entryData.servidor_almoxarifado;
-  const observacoes = entryData.observacoes;
-  const nota_fiscal_id = entryData.nota_fiscal_id;
-  const nota_fiscal_filename = entryData.nota_fiscal_filename;
 
   if (!produto || !String(produto).trim()) {
-    throw new Error('Descrição do produto é obrigatória');
+    throw new Error('Descricao do produto e obrigatoria');
   }
   if (!Number.isFinite(quantidade) || quantidade <= 0) {
-    throw new Error('Quantidade inválida');
+    throw new Error('Quantidade invalida');
   }
   if (!servidor_almoxarifado || !String(servidor_almoxarifado).trim()) {
-    throw new Error('Servidor do almoxarifado é obrigatório');
+    throw new Error('Servidor do almoxarifado e obrigatorio');
   }
 
-  // Procura produto existente pela descrição
-  let existingProduct = await Product.findOne({
-    descricao: { $regex: new RegExp(`^${produto}$`, 'i') }
-  });
+  let existingProduct = await getProductByDescription(String(produto).trim());
 
   if (existingProduct) {
-    // Se há nota fiscal, atualiza o produto
-    if (nota_fiscal_id) {
-      existingProduct.nota_fiscal_id = nota_fiscal_id;
-      existingProduct.nota_fiscal_filename = nota_fiscal_filename;
-      await existingProduct.save();
+    if (entryData.nota_fiscal_id) {
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({
+          nota_fiscal_id: entryData.nota_fiscal_id,
+          nota_fiscal_filename: entryData.nota_fiscal_filename || null,
+        })
+        .eq('id', existingProduct.id);
+
+      if (updateError) throw updateError;
+      existingProduct = {
+        ...existingProduct,
+        nota_fiscal_id: entryData.nota_fiscal_id,
+        nota_fiscal_filename: entryData.nota_fiscal_filename || null,
+      };
     }
   } else {
-    // Cria novo produto com nota fiscal se fornecida
-    const productData = {
+    const created = await productService.createProduct({
       descricao: produto,
-      quantidade,
+      unidade: entryData.unidade || '',
+      nota_fiscal_id: entryData.nota_fiscal_id || null,
+      nota_fiscal_filename: entryData.nota_fiscal_filename || null,
+    });
+
+    existingProduct = {
+      id: created._id,
+      codigo: created.codigo,
+      descricao: created.descricao,
     };
-    
-    if (nota_fiscal_id) {
-      productData.nota_fiscal_id = nota_fiscal_id;
-      productData.nota_fiscal_filename = nota_fiscal_filename;
-    }
-    
-    existingProduct = await productService.createProduct(productData);
   }
 
-  // Cria registro de movimentação
-  // Converte string de data para Date (adiciona T12:00:00 para evitar problema de fuso)
   let movementDate = data;
   if (typeof data === 'string' && data.length === 10) {
-    movementDate = new Date(data + 'T12:00:00');
+    movementDate = `${data}T12:00:00.000Z`;
   } else if (!data) {
-    movementDate = new Date();
+    movementDate = new Date().toISOString();
   }
 
-  const movement = new Movement({
-    produto_id: existingProduct._id,
+  const payload = {
+    produto_id: existingProduct.id,
     tipo: 'entrada',
     quantidade,
     data: movementDate,
     servidor_almoxarifado: servidor_almoxarifado || 'Sistema',
-  });
+    observacoes: entryData.observacoes || null,
+  };
 
-  await movement.save();
-  return movement;
+  const { data: movement, error } = await supabase
+    .from('movements')
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+
+  return mapMovementRow(movement, existingProduct);
 };
 
-/**
- * Registra uma saída de estoque
- */
 const createExit = async (exitData) => {
-  const { produto_id, quantidade, servidor_almoxarifado, data, setor_responsavel, servidor_retirada } = exitData;
+  const { produto_id, quantidade, servidor_almoxarifado, data, setor_responsavel, servidor_retirada, observacoes } = exitData;
 
-  // Busca produto
-  const produto = await Product.findById(produto_id);
-  if (!produto) {
-    throw new Error('Produto não encontrado');
+  const product = await getProductByIdRaw(produto_id);
+  if (!product) {
+    throw new Error('Produto nao encontrado');
   }
 
-  // Verifica estoque disponível calculando dinamicamente
-  const productService = await import('./productService.js');
-  const currentQuantity = await productService.default.calculateProductQuantity(produto_id);
-  
-  if (currentQuantity < quantidade) {
+  const currentQuantity = await productService.calculateProductQuantity(produto_id);
+  if (currentQuantity < Number(quantidade)) {
     throw new Error('Estoque insuficiente');
   }
 
-  // Cria registro de movimentação
-  // Converte string de data para Date (adiciona T12:00:00 para evitar problema de fuso)
   let movementDate = data;
   if (typeof data === 'string' && data.length === 10) {
-    movementDate = new Date(data + 'T12:00:00');
+    movementDate = `${data}T12:00:00.000Z`;
   } else if (!data) {
-    movementDate = new Date();
+    movementDate = new Date().toISOString();
   }
 
-  const movement = new Movement({
+  const payload = {
     produto_id,
     tipo: 'saida',
-    quantidade,
+    quantidade: Number(quantidade),
     data: movementDate,
     servidor_almoxarifado,
-    setor_responsavel,
-    servidor_retirada,
-  });
+    setor_responsavel: setor_responsavel || null,
+    servidor_retirada: servidor_retirada || null,
+    observacoes: observacoes || null,
+    setor: exitData.setor || null,
+  };
 
-  await movement.save();
-  return movement;
+  const { data: movement, error } = await supabase
+    .from('movements')
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+
+  return mapMovementRow(movement, product);
 };
 
-/**
- * Lista movimentações com filtros
- */
 const getMovements = async (filters = {}) => {
   const { search, tipo, startDate, endDate, limit, productId, setor } = filters;
 
-  let preLookupMatch = {}; // Filtros antes do $lookup
-  let postLookupMatch = {}; // Filtros depois do $lookup
+  let query = supabase
+    .from('movements')
+    .select('*')
+    .order('data', { ascending: false })
+    .order('created_at', { ascending: false });
 
-  // Filtro por tipo
   if (tipo && tipo !== 'all' && tipo !== 'ambos') {
-    preLookupMatch.tipo = tipo;
+    query = query.eq('tipo', tipo);
   }
 
-  // Filtro por produto (productId) - aplicado antes do lookup
   if (productId && productId !== 'todos') {
-    try {
-      const { ObjectId } = await import('mongodb');
-      preLookupMatch.produto_id = new ObjectId(productId);
-    } catch (e) {
-      preLookupMatch.produto_id = productId;
-    }
+    query = query.eq('produto_id', productId);
   }
 
-  // Filtro por setor - aplicado antes do lookup
   if (setor && setor !== 'todos') {
-    preLookupMatch.$or = [
-      { setor_responsavel: setor },
-      { setor: setor }
-    ];
+    query = query.or(`setor_responsavel.eq.${setor},setor.eq.${setor}`);
   }
 
-  // Filtro por data - aplicado antes do lookup
-  if (startDate || endDate) {
-    preLookupMatch.data = {};
-    if (startDate) {
-      preLookupMatch.data.$gte = new Date(startDate);
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      preLookupMatch.data.$lte = end;
-    }
+  if (startDate) {
+    query = query.gte('data', `${startDate}T00:00:00.000Z`);
   }
 
-  // Filtro de busca por descrição do produto - aplicado depois do lookup
-  if (search) {
-    postLookupMatch['produto_id.descricao'] = { $regex: search, $options: 'i' };
+  if (endDate) {
+    query = query.lte('data', `${endDate}T23:59:59.999Z`);
   }
 
-  // Construir pipeline de agregação
-  let pipeline = [];
-
-  // 1. Aplicar filtros antes do lookup (mais eficiente)
-  if (Object.keys(preLookupMatch).length > 0) {
-    pipeline.push({ $match: preLookupMatch });
-  }
-
-  // 2. Fazer lookup para produtos
-  pipeline.push(
-    {
-      $lookup: {
-        from: 'produtos',
-        localField: 'produto_id',
-        foreignField: '_id',
-        as: 'produto_id'
-      }
-    },
-    {
-      $unwind: '$produto_id'
-    }
-  );
-
-  // 3. Aplicar filtros depois do lookup (busca por descrição)
-  if (Object.keys(postLookupMatch).length > 0) {
-    pipeline.push({ $match: postLookupMatch });
-  }
-
-  // 4. Adicionar campo dataDia para ordenação
-  pipeline.push({
-    $addFields: {
-      dataDia: { $dateTrunc: { date: "$data", unit: "day" } }
-    }
-  });
-
-  // 5. Ordenação
-  pipeline.push({
-    $sort: { dataDia: -1, createdAt: -1 }
-  });
-
-  // 6. Limitação se especificada
   if (limit) {
-    pipeline.push({ $limit: limit });
+    query = query.limit(limit);
   }
 
-  const movements = await Movement.aggregate(pipeline);
-  return movements;
+  const { data: movements, error } = await query;
+  if (error) throw error;
+
+  if (!movements?.length) {
+    return [];
+  }
+
+  const productIds = [...new Set(movements.map((movement) => movement.produto_id))];
+
+  const { data: products, error: productError } = await supabase
+    .from('products')
+    .select('id,codigo,descricao')
+    .in('id', productIds);
+
+  if (productError) throw productError;
+
+  const productMap = new Map((products || []).map((product) => [product.id, product]));
+
+  let mapped = movements
+    .map((movement) => {
+      const product = productMap.get(movement.produto_id);
+      if (!product) return null;
+      return mapMovementRow(movement, product);
+    })
+    .filter(Boolean);
+
+  if (search) {
+    const normalizedSearch = search.toLowerCase();
+    mapped = mapped.filter((movement) => movement.produto_id.descricao.toLowerCase().includes(normalizedSearch));
+  }
+
+  return mapped;
 };
 
-/**
- * Obtém estatísticas de movimentações
- */
 const getMovementStats = async () => {
-  const movements = await Movement.find({});
-  
-  const totalEntries = movements
-    .filter(m => m.tipo === 'entrada')
-    .reduce((sum, m) => sum + m.quantidade, 0);
-    
-  const totalExits = movements
-    .filter(m => m.tipo === 'saida')
-    .reduce((sum, m) => sum + m.quantidade, 0);
+  const { data, error } = await supabase
+    .from('movements')
+    .select('tipo,quantidade');
+
+  if (error) throw error;
+
+  const totalEntries = (data || [])
+    .filter((movement) => movement.tipo === 'entrada')
+    .reduce((sum, movement) => sum + Number(movement.quantidade || 0), 0);
+
+  const totalExits = (data || [])
+    .filter((movement) => movement.tipo === 'saida')
+    .reduce((sum, movement) => sum + Number(movement.quantidade || 0), 0);
 
   return {
     totalEntries,
     totalExits,
-    totalMovements: movements.length,
+    totalMovements: (data || []).length,
   };
 };
 
-/**
- * Deleta movimentações de um produto
- */
 const deleteMovementsByProduct = async (produtoId) => {
-  await Movement.deleteMany({ produto_id: produtoId });
+  const { error } = await supabase
+    .from('movements')
+    .delete()
+    .eq('produto_id', produtoId);
+
+  if (error) throw error;
 };
 
 export default {
