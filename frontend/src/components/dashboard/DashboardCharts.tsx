@@ -47,29 +47,8 @@ const CHART_COLORS = {
   saidas: "hsl(var(--destructive))",
 };
 
-
-function groupMovementsByDate(movements: Movement[]): ChartDataPoint[] {
-  const grouped: Record<string, { entradas: number; saidas: number }> = {};
-
-  for (const movement of movements) {
-    const dateKey = format(new Date(movement.data), "dd/MM", { locale: ptBR });
-    if (!grouped[dateKey]) {
-      grouped[dateKey] = { entradas: 0, saidas: 0 };
-    }
-    if (movement.tipo === "entrada") {
-      grouped[dateKey].entradas += movement.quantidade;
-    } else {
-      grouped[dateKey].saidas += movement.quantidade;
-    }
-  }
-
-  return Object.entries(grouped).map(([name, values]) => ({
-    name,
-    ...values,
-  }));
-}
-
 interface CustomTooltipProps {
+
   active?: boolean;
   payload?: Array<{
     value: number;
@@ -101,13 +80,70 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   );
 }
 
+const PREDEFINED_SETORES = [
+  "Gabinete do Secretario",
+  "Assessoria de Apoio",
+  "Assessoria de Comunicacao",
+  "Assessoria Tecnica Juridico-Legislativa",
+  "Superintendencia de Governanca e Gestao Interna",
+  "Gerencia Tecnica de Gestao de Pessoal",
+  "Gerencia Tecnica de Gestao Administrativa, Projetos e Convenios",
+  "Gerencia Tecnica de Suprimentos, Licitacoes e Contratos",
+  "Gerencia Tecnica de Gestao Patrimonial e Transporte",
+  "Gerencia Tecnica de Gestao Orcamentaria e Financeira",
+  "Gerencia Tecnica de Contabilidade, Prestacao de Contas e Controle",
+  "Gerencia Tecnica de Infraestrutura e Tecnologica da Rede",
+  "Subsecretaria de Seguranca Cidada",
+  "Corregedoria Geral da Guarda Municipal",
+  "Ouvidoria Geral da Guarda Municipal",
+  "Coordenacao Geral do Centro de Operacoes e Inteligencia",
+  "Gerencia Tecnica de Ensino e Instrucao",
+  "Subsecretaria de Convivio Social",
+  "Diretoria de Licenciamento e Fiscalizacao de Posturas",
+  "Coordenacao Geral de Controle de Atividades no Espaco Publico e de Processos Especiais",
+  "Gerencia de Autorizacao para o Exercicio de Atividades em Logradouros Publicos",
+  "Gerencia de Analise e Licenciamento de Evento e Publicidade",
+  "Coordenacao Geral de Fiscalizacao de Posturas",
+  "Nucleo de Gerencias de Posturas Fiscalizacao de Posturas",
+  "Gerencia Tecnica de Fiscalizacao de Comercio de Ambulantes e Permissionarios",
+  "Gerencia de Conservacao e Guarda de Bens Apreendidos e Demolicao",
+];
+
+
+function groupMovementsByDate(movements: Movement[]): ChartDataPoint[] {
+  const grouped: Record<string, { entradas: number; saidas: number; date: Date }> = {};
+
+  for (const movement of movements) {
+    const dateKey = format(new Date(movement.data), "dd/MM", { locale: ptBR });
+    const dateObj = new Date(movement.data);
+    if (!grouped[dateKey]) {
+      grouped[dateKey] = { entradas: 0, saidas: 0, date: dateObj };
+    }
+    if (movement.tipo === "entrada") {
+      grouped[dateKey].entradas += movement.quantidade;
+    } else {
+      grouped[dateKey].saidas += movement.quantidade;
+    }
+  }
+
+  // Sort by date (oldest to newest - ascending)
+  return Object.entries(grouped)
+    .sort(([, a], [, b]) => a.date.getTime() - b.date.getTime())
+    .map(([name, values]) => ({
+      name,
+      entradas: values.entradas,
+      saidas: values.saidas,
+    }));
+}
+
 export function DashboardCharts() {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [setores, setSetores] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
+
 
   const [filters, setFilters] = useState<ChartFilters>({
     startDate: undefined,
@@ -117,22 +153,19 @@ export function DashboardCharts() {
     setor: "todos",
   });
 
-  // Load products and setores for filter options
+  // Load products for filter options
   useEffect(() => {
     async function loadFilterOptions() {
       try {
-        const [productsResponse, setoresData] = await Promise.all([
-          api.products.getAll(),
-          api.setores.getAll(),
-        ]);
+        const productsResponse = await api.products.getAll();
         setProducts(productsResponse.data || []);
-        setSetores(setoresData || []);
       } catch (error) {
         console.error("Erro ao carregar opcoes de filtro:", error);
       }
     }
     loadFilterOptions();
   }, []);
+
 
   const loadChartData = useCallback(async () => {
     try {
@@ -394,7 +427,7 @@ export function DashboardCharts() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos os Setores</SelectItem>
-                      {setores.map((setor) => (
+                      {PREDEFINED_SETORES.map((setor) => (
                         <SelectItem key={setor} value={setor}>
                           {setor}
                         </SelectItem>
@@ -402,6 +435,7 @@ export function DashboardCharts() {
                     </SelectContent>
                   </Select>
                 </div>
+
 
                 {/* Clear Filters */}
                 <div className="flex items-end">

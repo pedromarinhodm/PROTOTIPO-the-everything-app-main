@@ -12,6 +12,35 @@ import { format } from "date-fns";
 import { api } from "@/services/api";
 import { Product } from "@/services/api";
 
+const PREDEFINED_SETORES = [
+  "Gabinete do Secretario",
+  "Assessoria de Apoio",
+  "Assessoria de Comunicacao",
+  "Assessoria Tecnica Juridico-Legislativa",
+  "Superintendencia de Governanca e Gestao Interna",
+  "Gerencia Tecnica de Gestao de Pessoal",
+  "Gerencia Tecnica de Gestao Administrativa, Projetos e Convenios",
+  "Gerencia Tecnica de Suprimentos, Licitacoes e Contratos",
+  "Gerencia Tecnica de Gestao Patrimonial e Transporte",
+  "Gerencia Tecnica de Gestao Orcamentaria e Financeira",
+  "Gerencia Tecnica de Contabilidade, Prestacao de Contas e Controle",
+  "Gerencia Tecnica de Infraestrutura e Tecnologica da Rede",
+  "Subsecretaria de Seguranca Cidada",
+  "Corregedoria Geral da Guarda Municipal",
+  "Ouvidoria Geral da Guarda Municipal",
+  "Coordenacao Geral do Centro de Operacoes e Inteligencia",
+  "Gerencia Tecnica de Ensino e Instrucao",
+  "Subsecretaria de Convivio Social",
+  "Diretoria de Licenciamento e Fiscalizacao de Posturas",
+  "Coordenacao Geral de Controle de Atividades no Espaco Publico e de Processos Especiais",
+  "Gerencia de Autorizacao para o Exercicio de Atividades em Logradouros Publicos",
+  "Gerencia de Analise e Licenciamento de Evento e Publicidade",
+  "Coordenacao Geral de Fiscalizacao de Posturas",
+  "Nucleo de Gerencias de Posturas Fiscalizacao de Posturas",
+  "Gerencia Tecnica de Fiscalizacao de Comercio de Ambulantes e Permissionarios",
+  "Gerencia de Conservacao e Guarda de Bens Apreendidos e Demolicao",
+];
+
 export default function Exits() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +92,7 @@ export default function Exits() {
       return;
     }
     if (!formData.quantidade || parseInt(formData.quantidade) <= 0) {
-      toast.error("Informe uma quantidade válida");
+      toast.error("Informe uma quantidade valida");
       return;
     }
     if (!formData.servidor_almoxarifado.trim()) {
@@ -71,7 +100,7 @@ export default function Exits() {
       return;
     }
     if (parseInt(formData.quantidade) > availableQuantity) {
-      toast.error("Quantidade maior que o estoque disponível");
+      toast.error("Quantidade maior que o estoque disponivel");
       return;
     }
 
@@ -87,18 +116,12 @@ export default function Exits() {
         servidor_retirada: formData.servidor_retirada.trim() || undefined,
       });
 
-      toast.success(
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4" />
-          <span>Saída registrada com sucesso!</span>
-        </div>
-      );
+      toast.success("Saida registrada com sucesso!");
       resetForm();
-      // Reload products to update quantities
       loadProducts();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast.error("Erro ao registrar saída: " + errorMessage);
+      toast.error("Erro ao registrar saida: " + errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -107,8 +130,8 @@ export default function Exits() {
   return (
     <MainLayout>
       <PageHeader
-        title="Registro de Saídas"
-        description="Registre a saída de materiais do almoxarifado"
+        title="Registro de Saidas"
+        description="Registre a saida de materiais do almoxarifado"
       />
 
       <div className="max-w-3xl">
@@ -119,7 +142,7 @@ export default function Exits() {
                 <ArrowUpFromLine className="h-5 w-5 text-info" />
               </div>
               <div>
-                <CardTitle>Nova Saída</CardTitle>
+                <CardTitle>Nova Saida</CardTitle>
                 <CardDescription>
                   Selecione o produto e informe os dados do requisitante
                 </CardDescription>
@@ -128,10 +151,9 @@ export default function Exits() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Product Selection */}
               <div className="space-y-4">
                 <h3 className="text-sm font-medium text-muted-foreground">
-                  Seleção do Produto
+                  Selecao do Produto
                 </h3>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2 sm:col-span-2">
@@ -165,7 +187,7 @@ export default function Exits() {
                     <div className="sm:col-span-2 rounded-lg border bg-muted/50 p-3">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">
-                          Estoque disponível:
+                          Estoque disponivel:
                         </span>
                         <span className="font-semibold">
                           {availableQuantity} {selectedProduct.unidade}
@@ -188,7 +210,7 @@ export default function Exits() {
                       placeholder="0"
                       disabled={!selectedProduct}
                     />
-                    {formData.quantidade && parseInt(formData.quantidade) > availableQuantity && (
+                    {formData.quantidade !== "" && parseInt(formData.quantidade) > availableQuantity && (
                       <p className="text-xs text-destructive flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
                         Quantidade maior que o estoque
@@ -209,10 +231,9 @@ export default function Exits() {
                 </div>
               </div>
 
-              {/* Server Info */}
               <div className="space-y-4">
                 <h3 className="text-sm font-medium text-muted-foreground">
-                  Responsáveis
+                  Responsaveis
                 </h3>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
@@ -228,14 +249,25 @@ export default function Exits() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="requestingSector">Setor Requisitante</Label>
-                    <Input
-                      id="requestingSector"
-                      value={formData.setor_responsavel}
-                      onChange={(e) =>
-                        setFormData({ ...formData, setor_responsavel: e.target.value })
+                    <Select
+                      value={formData.setor_responsavel || "_none_"}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, setor_responsavel: value === "_none_" ? "" : value })
                       }
-                      placeholder="Nome do setor"
-                    />
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um setor" />
+                      </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none_">Nenhum setor</SelectItem>
+                      {PREDEFINED_SETORES.map((setor) => (
+                        <SelectItem key={setor} value={setor}>
+                          {setor}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="requestingServer">Servidor Requisitante</Label>
@@ -251,7 +283,6 @@ export default function Exits() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3 pt-4">
                 <Button
                   type="button"
@@ -267,7 +298,7 @@ export default function Exits() {
                   className="flex-1 sm:flex-none"
                 >
                   <ArrowUpFromLine className="mr-2 h-4 w-4" />
-                  Registrar Saída
+                  Registrar Saida
                 </Button>
               </div>
             </form>

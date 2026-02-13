@@ -182,11 +182,14 @@ export default function Products() {
     }
   };
 
-  const filteredProducts = (products || []).filter(product =>
-    product.descricao.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.fornecedor?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.codigo.toString().includes(searchQuery)
-  );
+  const filteredProducts = (products || [])
+    .filter(product =>
+      product.descricao.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.fornecedor?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.codigo.toString().includes(searchQuery)
+    )
+    .sort((a, b) => a.codigo - b.codigo);
+
 
 
 
