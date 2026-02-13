@@ -12,6 +12,7 @@ const movementSchema = new mongoose.Schema(
     servidor_almoxarifado: { type: String, required: true },
     setor_responsavel: { type: String },
     servidor_retirada: { type: String },
+    matricula: { type: String, required: true },
     // ✅ Correção: grava data local ajustada para fuso horário
     data: {
       type: Date,

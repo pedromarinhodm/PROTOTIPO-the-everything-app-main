@@ -31,6 +31,7 @@ export interface Movement {
   servidor_almoxarifado?: string;
   setor_responsavel?: string;
   servidor_retirada?: string;
+  matricula?: string;
   observacoes?: string;
   setor?: string;
   createdAt: string;

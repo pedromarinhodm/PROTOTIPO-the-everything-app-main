@@ -119,7 +119,7 @@ const createEntry = async (entryData) => {
 };
 
 const createExit = async (exitData) => {
-  const { produto_id, quantidade, servidor_almoxarifado, data, setor_responsavel, servidor_retirada, observacoes } = exitData;
+  const { produto_id, quantidade, servidor_almoxarifado, data, setor_responsavel, servidor_retirada, matricula, observacoes } = exitData;
 
   const product = await getProductByIdRaw(produto_id);
   if (!product) {
@@ -146,6 +146,7 @@ const createExit = async (exitData) => {
     servidor_almoxarifado,
     setor_responsavel: setor_responsavel || null,
     servidor_retirada: servidor_retirada || null,
+    matricula: matricula || null,
     observacoes: observacoes || null,
     setor: exitData.setor || null,
   };

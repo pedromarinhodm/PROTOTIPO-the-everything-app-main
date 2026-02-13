@@ -51,6 +51,7 @@ export default function Exits() {
     data: format(new Date(), "yyyy-MM-dd"),
     setor_responsavel: "",
     servidor_retirada: "",
+    matricula: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -81,6 +82,7 @@ export default function Exits() {
       data: format(new Date(), "yyyy-MM-dd"),
       setor_responsavel: "",
       servidor_retirada: "",
+      matricula: "",
     });
   };
 
@@ -99,6 +101,18 @@ export default function Exits() {
       toast.error("Informe o servidor do almoxarifado");
       return;
     }
+    if (!formData.setor_responsavel.trim()) {
+      toast.error("Informe o setor requisitante");
+      return;
+    }
+    if (!formData.servidor_retirada.trim()) {
+      toast.error("Informe o servidor requisitante");
+      return;
+    }
+    if (!formData.matricula.trim()) {
+      toast.error("Informe a matricula");
+      return;
+    }
     if (parseInt(formData.quantidade) > availableQuantity) {
       toast.error("Quantidade maior que o estoque disponivel");
       return;
@@ -112,8 +126,9 @@ export default function Exits() {
         quantidade: parseInt(formData.quantidade),
         servidor_almoxarifado: formData.servidor_almoxarifado.trim(),
         data: formData.data,
-        setor_responsavel: formData.setor_responsavel.trim() || undefined,
-        servidor_retirada: formData.servidor_retirada.trim() || undefined,
+        setor_responsavel: formData.setor_responsavel.trim(),
+        servidor_retirada: formData.servidor_retirada.trim(),
+        matricula: formData.matricula.trim(),
       });
 
       toast.success("Saida registrada com sucesso!");
@@ -248,18 +263,17 @@ export default function Exits() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="requestingSector">Setor Requisitante</Label>
+                    <Label htmlFor="requestingSector">Setor Requisitante *</Label>
                     <Select
-                      value={formData.setor_responsavel || "_none_"}
+                      value={formData.setor_responsavel || ""}
                       onValueChange={(value) =>
-                        setFormData({ ...formData, setor_responsavel: value === "_none_" ? "" : value })
+                        setFormData({ ...formData, setor_responsavel: value })
                       }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione um setor" />
                       </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="_none_">Nenhum setor</SelectItem>
                       {PREDEFINED_SETORES.map((setor) => (
                         <SelectItem key={setor} value={setor}>
                           {setor}
@@ -270,7 +284,7 @@ export default function Exits() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="requestingServer">Servidor Requisitante</Label>
+                    <Label htmlFor="requestingServer">Servidor Requisitante *</Label>
                     <Input
                       id="requestingServer"
                       value={formData.servidor_retirada}
@@ -278,6 +292,17 @@ export default function Exits() {
                         setFormData({ ...formData, servidor_retirada: e.target.value })
                       }
                       placeholder="Nome do servidor"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="matricula">Matricula *</Label>
+                    <Input
+                      id="matricula"
+                      value={formData.matricula}
+                      onChange={(e) =>
+                        setFormData({ ...formData, matricula: e.target.value })
+                      }
+                      placeholder="Numero da matricula"
                     />
                   </div>
                 </div>

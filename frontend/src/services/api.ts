@@ -129,6 +129,7 @@ class ApiService {
       data?: string;
       setor_responsavel?: string;
       servidor_retirada?: string;
+      matricula: string;
     }): Promise<{ success: boolean; message: string }> =>
       this.request('/saida', {
         method: 'POST',
